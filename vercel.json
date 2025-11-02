@@ -1,14 +1,5 @@
 {
   "version": 3,
-  "builds": [
-    {
-      "src": "package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "dist"
-      }
-    }
-  ],
   "rewrites": [{ "source": "/(.*)", "destination": "/" }],
   "cleanUrls": true,
   "trailingSlash": false
