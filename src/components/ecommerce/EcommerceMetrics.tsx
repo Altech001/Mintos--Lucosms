@@ -19,9 +19,9 @@ export default function EcommerceMetrics() {
             <span className="text-sm text-gray-500 dark:text-gray-400">
               SMS Success
             </span>
-            <h4 className="mt-2 font-bold text-gray-800 text-title-sm dark:text-white/90">
+            <h5 className="mt-2 font-bold text-gray-800 text-title-xs dark:text-white/90">
               3,782
-            </h4>
+            </h5>
           </div>
           <Badge color="success">
             <ArrowUpIcon />
@@ -42,9 +42,9 @@ export default function EcommerceMetrics() {
             <span className="text-sm text-gray-500 dark:text-gray-400">
               Delivered
             </span>
-            <h4 className="mt-2 font-bold text-gray-800 text-title-sm dark:text-white/90">
+            <h5 className="mt-2 font-bold text-gray-800 text-title-xs dark:text-white/90">
               50,359
-            </h4>
+            </h5>
           </div>
 
           <Badge color="warning">
@@ -64,7 +64,7 @@ export default function EcommerceMetrics() {
             <span className="text-sm text-gray-500 dark:text-gray-400">
               Extension
             </span>
-            <h4 className="mt-2 font-bold text-gray-800 text-title-sm dark:text-white/90">
+            <h4 className="mt-2 font-bold text-gray-800 text-title-xs dark:text-white/90">
               4 
             </h4>
           </div>
