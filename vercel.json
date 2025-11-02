@@ -9,12 +9,7 @@
       }
     }
   ],
-  "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
-    }
-  ],
+  "rewrites": [{ "source": "/(.*)", "destination": "/" }],
   "cleanUrls": true,
   "trailingSlash": false
 }
