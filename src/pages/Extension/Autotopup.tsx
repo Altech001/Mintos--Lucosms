@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowRight, BadgeCheck, CheckCircle, Clock, CreditCard, DollarSign, History, Loader2, Shield, TrendingUp, XCircle } from 'lucide-react';
+import { ArrowRight, BadgeCheck, CheckCircle, Clock, CreditCard, DollarSign, History, Loader2, Shield, TrendingUp, XCircle, Phone } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import PageBreadcrumb from "../../components/common/PageBreadCrumb";
 import PageMeta from "../../components/common/PageMeta";
@@ -8,6 +8,9 @@ import Input from "../../components/form/input/InputField";
 import Label from "../../components/form/Label";
 import Alert from "../../components/ui/alert/Alert";
 import Button from "../../components/ui/button/Button";
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { apiClient } from "../../lib/api/client";
+import type { AddFundsRequest, WalletResponse } from "../../lib/api";
 
 type Tab = 'topup' | 'history';
 
@@ -22,14 +25,34 @@ interface Transaction {
 
 export default function AutoTopUp() {
   const [activeTab, setActiveTab] = useState<Tab>('topup');
-  const [balance, setBalance] = useState(1250.00);
   const [showTopUpModal, setShowTopUpModal] = useState(false);
   const [showOTPModal, setShowOTPModal] = useState(false);
+  const [showNumberModal, setShowNumberModal] = useState(false);
   const [alert, setAlert] = useState<{ variant: 'success' | 'error' | 'warning' | 'info'; title: string; message: string } | null>(null);
 
   const [topUpAmount, setTopUpAmount] = useState('');
   const [otp, setOtp] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [phoneNumber, setPhoneNumber] = useState('');
+
+  const queryClient = useQueryClient();
+
+  // Wallet balance query
+  const walletQuery = useQuery<WalletResponse>({
+    queryKey: ['wallet'],
+    queryFn: () => apiClient.api.userData.userDataGetWalletBalance(),
+    staleTime: 60_000,
+  });
+  const balance = Number.parseFloat(walletQuery.data?.walletBalance ?? '0');
+
+  // Add funds mutation (called after OTP verification success)
+  const addFundsMutation = useMutation({
+    mutationFn: async (payload: AddFundsRequest) =>
+      apiClient.api.userData.userDataAddFundsToWallet({ addFundsRequest: payload }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['wallet'] });
+    },
+  });
 
   // Mock history
   const [history, setHistory] = useState<Transaction[]>([
@@ -41,6 +64,12 @@ export default function AutoTopUp() {
   const handleInitiateTopUp = () => {
     const amount = parseFloat(topUpAmount);
     if (!amount || amount <= 0) return;
+    // Require phone number before proceeding
+    if (!phoneNumber) {
+      setAlert({ variant: 'warning', title: 'Add Phone Number', message: 'Please add your phone number to receive the OTP.' });
+      setShowNumberModal(true);
+      return;
+    }
 
     setShowTopUpModal(false);
     setShowOTPModal(true);
@@ -57,7 +86,12 @@ export default function AutoTopUp() {
       const success = Math.random() > 0.25; // 75% success
       if (success) {
         const amount = parseFloat(topUpAmount);
-        setBalance(prev => prev + amount);
+        // Simulate successful payment then persist via API
+        void addFundsMutation.mutateAsync({
+          amount,
+          paymentMethod: 'Card',
+          referenceNumber: 'TOPUP-' + Date.now(),
+        });
         const newTx: Transaction = {
           id: 'TXN' + Date.now(),
           amount,
@@ -81,8 +115,15 @@ export default function AutoTopUp() {
   const resetModals = () => {
     setShowTopUpModal(false);
     setShowOTPModal(false);
+    setShowNumberModal(false);
     setTopUpAmount('');
     setOtp('');
+  };
+
+  const maskNumber = (num: string) => {
+    const digits = num.replace(/\D/g, '');
+    if (digits.length <= 4) return digits;
+    return `${digits.slice(0, 3)}***${digits.slice(-3)}`;
   };
 
   useEffect(() => {
@@ -127,12 +168,25 @@ export default function AutoTopUp() {
                 <TrendingUp className="h-3 w-3" />
                 Auto Top-Up Enabled
               </p>
+              <div className="mt-3 flex items-center gap-2 text-xs opacity-90">
+                <Phone className="h-3.5 w-3.5" />
+                {phoneNumber ? (
+                  <span>OTP will be sent to {maskNumber(phoneNumber)}</span>
+                ) : (
+                  <span>No phone number added</span>
+                )}
+              </div>
             </div>
             <div>
                 
             </div>
-            <div className="rounded-full bg-white/20 p-4 backdrop-blur-sm">
-              <BadgeCheck className="h-10 w-10" />
+            <div className="flex items-center gap-3">
+              <Button variant="outline" onClick={() => setShowNumberModal(true)} className="bg-white/15 text-white border-white/30 hover:bg-white/25">
+                {phoneNumber ? 'Change Number' : 'Add Number'}
+              </Button>
+              <div className="rounded-full bg-white/20 p-4 backdrop-blur-sm">
+                <BadgeCheck className="h-10 w-10" />
+              </div>
             </div>
           </div>
         </div>
@@ -323,7 +377,7 @@ export default function AutoTopUp() {
                   Enter OTP
                 </h3>
                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                  Check your phone for 6-digit code
+                  Check your phone for 6-digit code {phoneNumber ? `sent to ${maskNumber(phoneNumber)}` : ''}
                 </p>
               </div>
             </div>
@@ -355,6 +409,51 @@ export default function AutoTopUp() {
                   ) : (
                     'Verify & Add'
                   )}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add/Change Number Modal */}
+      {showNumberModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl dark:bg-gray-900">
+            <div className="mb-6 flex items-center justify-between">
+              <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
+                {phoneNumber ? 'Change Phone Number' : 'Add Phone Number'}
+              </h3>
+              <button
+                onClick={() => setShowNumberModal(false)}
+                className="rounded-lg p-1 hover:bg-gray-100 dark:hover:bg-white/10"
+              >
+                <XCircle className="h-5 w-5 text-gray-500" />
+              </button>
+            </div>
+
+            <div className="space-y-5">
+              <div>
+                <Label>Phone Number</Label>
+                <Input
+                  type="tel"
+                  placeholder="e.g. 256712345678"
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value.replace(/[^\d+]/g, ''))}
+                />
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Use your active number. Format: countrycode + number (e.g., 2567xxxxxxx)</p>
+              </div>
+
+              <div className="flex gap-3">
+                <Button variant="outline" onClick={() => setShowNumberModal(false)} className="flex-1">
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => setShowNumberModal(false)}
+                  disabled={!phoneNumber || phoneNumber.replace(/\D/g, '').length < 9}
+                  className="flex-1"
+                >
+                  Save Number
                 </Button>
               </div>
             </div>

@@ -3,7 +3,7 @@
 import { useState, useCallback } from "react"
 import { useDropzone } from "react-dropzone"
 import { Upload, FileText, Users, Zap, CheckCircle, Download } from "lucide-react"
-import * as XLSX from "xlsx"
+// Dynamically import xlsx only when needed to reduce bundle size
 
 interface Contact {
   name: string
@@ -53,7 +53,7 @@ export default function ContactChunker() {
     setIsProcessing(true)
     const reader = new FileReader()
 
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
         const data = e.target?.result
         let contacts: Contact[] = []
@@ -72,9 +72,10 @@ export default function ContactChunker() {
             }
           })
         } else if (file.name.endsWith(".xlsx") || file.name.endsWith(".xls")) {
-          const workbook = XLSX.read(data, { type: "binary" })
+          const { read, utils } = await import("xlsx")
+          const workbook = read(data as string, { type: "binary" })
           const worksheet = workbook.Sheets[workbook.SheetNames[0]]
-          const jsonData = XLSX.utils.sheet_to_json(worksheet) as Record<string, string>[]
+          const jsonData = utils.sheet_to_json(worksheet) as Record<string, string>[]
 
           contacts = jsonData.map((row) => ({
             name: row.name || row.Name || row.NAME || row.contact || row.Contact || "N/A",

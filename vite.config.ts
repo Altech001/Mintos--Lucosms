@@ -15,4 +15,29 @@ export default defineConfig({
       },
     }),
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ["react", "react-dom", "@tanstack/react-query"],
+          xlsx: ["xlsx"],
+          fullcalendar: [
+            "@fullcalendar/core",
+            "@fullcalendar/react",
+            "@fullcalendar/daygrid",
+            "@fullcalendar/timegrid",
+            "@fullcalendar/interaction",
+            "@fullcalendar/list",
+          ],
+          vectormap: [
+            "@react-jvectormap/core",
+            "@react-jvectormap/world",
+            "@react-jvectormap/africa",
+          ],
+          lucide: ["lucide-react"],
+        },
+      },
+    },
+    chunkSizeWarningLimit: 1200,
+  },
 });

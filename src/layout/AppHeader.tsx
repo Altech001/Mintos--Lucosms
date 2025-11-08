@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
-import { Link } from "react-router";
+import { Link } from "react-router-dom";
+import UserDropdown from "../components/header/UserDropdown";
 import { ThemeToggleButton } from "../components/common/ThemeToggleButton";
 import NotificationDropdown from "../components/header/NotificationDropdown";
 import WalletButton from "../components/wallet/walletbtn";
@@ -138,7 +139,7 @@ const AppHeader: React.FC = () => {
             {/* <!-- Notification Menu Area --> */}
           </div>
           {/* <!-- User Area --> */}
-          {/* <UserDropdown /> */}
+          <UserDropdown />
         </div>
       </div>
     </header>

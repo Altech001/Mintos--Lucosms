@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, useLocation } from "react-router";
-
-
-import { BanknoteArrowUpIcon, LayoutTemplate, MailIcon, MessageCircleMore, SquareActivity, SquareStack, StoreIcon } from "lucide-react";
+import { Link, useLocation } from "react-router-dom";
+import { BanknoteArrowUpIcon, LayoutTemplate, MailIcon, MessageCircleMore, SquareActivity, SquareStack, StoreIcon, UsersIcon, TicketPercentIcon, KeyRoundIcon } from "lucide-react";
 import { useSidebar } from "../context/SidebarContext";
+import { useAuth } from "../context/AuthContext";
 import {
   ChevronDownIcon,
   PlugInIcon
@@ -72,12 +71,34 @@ const othersItems: NavItem[] = [
   },
 ];
 
+const developerItems: NavItem[] = [
+  {
+    name: "Developer API",
+    icon: <KeyRoundIcon />,
+    path: "/developer/api-keys",
+  },
+];
+
+const adminItems: NavItem[] = [
+  {
+    name: "User Management",
+    icon: <UsersIcon />,
+    path: "/admin/users",
+  },
+  {
+    name: "Promo Codes",
+    icon: <TicketPercentIcon />,
+    path: "/admin/promo-codes",
+  },
+];
+
 const AppSidebar: React.FC = () => {
   const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
+  const { user } = useAuth();
   const location = useLocation();
 
   const [openSubmenu, setOpenSubmenu] = useState<{
-    type: "main" | "others";
+    type: "main" | "others" | "admin" | "developer";
     index: number;
   } | null>(null);
   const [subMenuHeight, setSubMenuHeight] = useState<Record<string, number>>(
@@ -93,16 +114,21 @@ const AppSidebar: React.FC = () => {
 
   useEffect(() => {
     let submenuMatched = false;
-    ["main", "others"].forEach((menuType) => {
-      const items = menuType === "main" ? navItems : othersItems;
+    const allMenus: { type: "main" | "others" | "admin" | "developer"; items: NavItem[] }[] = [
+      { type: "main", items: navItems },
+      { type: "others", items: othersItems },
+      { type: "developer", items: developerItems },
+    ];
+    if (user?.isSuperuser) {
+      allMenus.push({ type: "admin", items: adminItems });
+    }
+
+    allMenus.forEach(({ type, items }) => {
       items.forEach((nav, index) => {
         if (nav.subItems) {
           nav.subItems.forEach((subItem) => {
             if (isActive(subItem.path)) {
-              setOpenSubmenu({
-                type: menuType as "main" | "others",
-                index,
-              });
+              setOpenSubmenu({ type, index });
               submenuMatched = true;
             }
           });
@@ -113,7 +139,7 @@ const AppSidebar: React.FC = () => {
     if (!submenuMatched) {
       setOpenSubmenu(null);
     }
-  }, [location, isActive]);
+  }, [location, isActive, user?.isSuperuser]);
 
   useEffect(() => {
     if (openSubmenu !== null) {
@@ -127,7 +153,7 @@ const AppSidebar: React.FC = () => {
     }
   }, [openSubmenu]);
 
-  const handleSubmenuToggle = (index: number, menuType: "main" | "others") => {
+  const handleSubmenuToggle = (index: number, menuType: "main" | "others" | "admin" | "developer") => {
     setOpenSubmenu((prevOpenSubmenu) => {
       if (
         prevOpenSubmenu &&
@@ -140,7 +166,7 @@ const AppSidebar: React.FC = () => {
     });
   };
 
-  const renderMenuItems = (items: NavItem[], menuType: "main" | "others") => (
+  const renderMenuItems = (items: NavItem[], menuType: "main" | "others" | "admin" | "developer") => (
     <ul className="flex flex-col gap-4.5">
       {items.map((nav, index) => (
         <li key={nav.name}>
@@ -336,6 +362,24 @@ const AppSidebar: React.FC = () => {
               </h2>
               {renderMenuItems(othersItems, "others")}
             </div>
+            <div className="mt-6">
+              {renderMenuItems(developerItems, "developer")}
+            </div>
+
+            {user?.isSuperuser && (
+              <div className="mt-6">
+                <h2
+                  className={`mb-4 text-xs uppercase flex text-gray-400 ${
+                    !isExpanded && !isHovered
+                      ? "lg:justify-center"
+                      : "justify-start"
+                  }`}
+                >
+                  Admin
+                </h2>
+                {renderMenuItems(adminItems, "admin")}
+              </div>
+            )}
           </div>
         </nav>
         {isExpanded || isHovered || isMobileOpen ? <SidebarWidget /> : null}

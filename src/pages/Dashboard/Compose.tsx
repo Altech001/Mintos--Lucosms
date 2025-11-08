@@ -20,7 +20,8 @@ import {
 import type React from "react";
 import { useCallback, useState } from "react";
 import { useDropzone } from "react-dropzone";
-import * as XLSX from "xlsx";
+import { useQuery } from "@tanstack/react-query";
+import { apiClient } from "../../lib/api/client";
 import ComponentCard from "../../components/common/ComponentCard";
 import PageBreadcrumb from "../../components/common/PageBreadCrumb";
 import PageMeta from "../../components/common/PageMeta";
@@ -131,8 +132,14 @@ export default function ComposePage() {
   const [showTemplates, setShowTemplates] = useState(false);
   const [templateIndex, setTemplateIndex] = useState(0);
 
-  const balance = 730;
-  const costPerSms = 32;
+  // Live wallet and SMS cost
+  const statsQuery = useQuery({
+    queryKey: ["userStats"],
+    queryFn: async () => apiClient.api.userData.userDataGetUserStats(),
+    staleTime: 30_000,
+  });
+  const balance = Number(statsQuery.data?.walletBalance ?? 0);
+  const costPerSms = Number(statsQuery.data?.smsCost ?? 32);
   const charLimit = 160;
   const remaining = charLimit - message.length;
   const selectedContactCount = Array.from(selectedGroups).reduce(
@@ -141,10 +148,9 @@ export default function ComposePage() {
     },
     0
   );
-  const totalCost =
-    selectedContactCount *
-    (messageSegments.length + (message.length > 0 ? 1 : 0)) *
-    costPerSms;
+  const totalSegments = messageSegments.length + (message.length > 0 ? 1 : 0);
+  const totalCost = selectedContactCount * totalSegments * costPerSms;
+  const isInsufficient = !statsQuery.isLoading && totalCost > balance;
 
   // ──────────────────────────────────────────────────────────────────────
   // File Import
@@ -152,7 +158,7 @@ export default function ComposePage() {
   const parseFile = useCallback((file: File) => {
     const reader = new FileReader();
 
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
         const data = e.target?.result;
         let contacts: Contact[] = [];
@@ -176,9 +182,10 @@ export default function ComposePage() {
             };
           });
         } else if (file.name.endsWith(".xlsx") || file.name.endsWith(".xls")) {
-          const workbook = XLSX.read(data, { type: "binary" });
+          const { read, utils } = await import("xlsx");
+          const workbook = read(data, { type: "binary" });
           const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-          const jsonData = XLSX.utils.sheet_to_json(worksheet) as Record<
+          const jsonData = utils.sheet_to_json(worksheet) as Record<
             string,
             string
           >[];
@@ -345,6 +352,11 @@ export default function ComposePage() {
       (message.trim() === "" && messageSegments.length === 0)
     )
       return;
+
+    if (isInsufficient) {
+      alert("Insufficient balance to send these messages.");
+      return;
+    }
 
     setIsSending(true);
     setShowQueue(true);
@@ -693,9 +705,12 @@ export default function ComposePage() {
                       {remaining < 0 ? "over" : "remaining"}
                     </span>
                     <span className="text-gray-400">Cost: {totalCost} UGX</span>
-                    <span className="text-gray-400">
+                    <span className={isInsufficient ? "text-red-400" : "text-gray-400"}>
                       Balance: {balance} UGX
                     </span>
+                    {isInsufficient && (
+                      <span className="text-red-500 font-medium">Insufficient balance</span>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-2">
@@ -711,7 +726,8 @@ export default function ComposePage() {
                       disabled={
                         isSending ||
                         selectedGroups.size === 0 ||
-                        (message.trim() === "" && messageSegments.length === 0)
+                        (message.trim() === "" && messageSegments.length === 0) ||
+                        isInsufficient
                       }
                       className="px-5 py-2 bg-brand-600 hover:bg-brand-700 disabled:bg-gray-600 text-white font-medium rounded-lg transition-colors flex items-center gap-2"
                     >

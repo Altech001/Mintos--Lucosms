@@ -10,140 +10,122 @@ import TextArea from "../../components/form/input/TextArea";
 import Badge from "../../components/ui/badge/Badge";
 import Button from "../../components/ui/button/Button";
 import Select from '../../components/form/Select';
-
-// ──────────────────────────────────────────────────────────────────────
-// Types
-// ──────────────────────────────────────────────────────────────────────
-interface Ticket {
-  id: number;
-  title: string;
-  description: string;
-  status: 'open' | 'in-progress' | 'resolved' | 'closed';
-  priority: 'low' | 'medium' | 'high' | 'urgent';
-  assignee: string;
-  createdAt: string;
-  updatedAt: string;
-}
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { apiClient } from "../../lib/api/client";
+import type { TicketPublic, TicketsPublic, TicketCreate, TicketUpdate } from "../../lib/api";
+import { useAuth } from "../../context/AuthContext";
 
 type ModalMode = 'view' | 'edit' | 'create';
-
-// ──────────────────────────────────────────────────────────────────────
-// Dummy Data
-// ──────────────────────────────────────────────────────────────────────
-const dummyTickets: Ticket[] = [
-  { 
-    id: 1, 
-    title: "Payment Failed Notification", 
-    description: "User reports payment failure SMS not received", 
-    status: 'open', 
-    priority: 'high', 
-    assignee: "Support Team", 
-    createdAt: "Oct 31, 2025", 
-    updatedAt: "Oct 31, 2025" 
-  },
-  { 
-    id: 2, 
-    title: "Verification Code Delay", 
-    description: "SMS verification code arrives 2 minutes late", 
-    status: 'in-progress', 
-    priority: 'medium', 
-    assignee: "Dev Team", 
-    createdAt: "Oct 30, 2025", 
-    updatedAt: "Oct 31, 2025" 
-  },
-  { 
-    id: 3, 
-    title: "Bulk Send Limit Exceeded", 
-    description: "Error when sending to 500+ contacts", 
-    status: 'resolved', 
-    priority: 'low', 
-    assignee: "Admin", 
-    createdAt: "Oct 29, 2025", 
-    updatedAt: "Oct 30, 2025" 
-  },
-  { 
-    id: 4, 
-    title: "Template Preview Broken", 
-    description: "Preview doesn't show variables like {{name}}", 
-    status: 'closed', 
-    priority: 'urgent', 
-    assignee: "Support Team", 
-    createdAt: "Oct 28, 2025", 
-    updatedAt: "Oct 31, 2025" 
-  },
-];
 
 // ──────────────────────────────────────────────────────────────────────
 // Main Component
 // ──────────────────────────────────────────────────────────────────────
 export default function TicketsPage() {
-  const [tickets, setTickets] = useState<Ticket[]>(dummyTickets);
-  const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
+  const { user } = useAuth();
+  const isSuper = user?.isSuperuser === true;
+  const queryClient = useQueryClient();
+
+  const [selectedTicket, setSelectedTicket] = useState<TicketPublic | null>(null);
   const [modalMode, setModalMode] = useState<ModalMode>('view');
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [isLoading, setIsLoading] = useState(false);
+
+  // Filters (admin only can filter by priority too)
+  const [statusFilter, setStatusFilter] = useState<string>('');
+  const [priorityFilter, setPriorityFilter] = useState<string>('');
 
   // Form states
   const [formData, setFormData] = useState({
-    title: '',
+    subject: '',
     description: '',
-    status: 'open' as Ticket['status'],
-    priority: 'medium' as Ticket['priority'],
-    assignee: '',
+    status: 'open' as NonNullable<TicketPublic['status']>,
+    priority: 'medium' as NonNullable<TicketPublic['priority']>,
+    assignedTo: '',
   });
 
   const itemsPerPage = 6;
 
+  // Queries
+  const ticketsQuery = useQuery<TicketsPublic>({
+    queryKey: ['tickets', isSuper ? 'all' : 'mine', currentPage, itemsPerPage, statusFilter, isSuper ? priorityFilter : ''],
+    queryFn: async () => {
+      const skip = (currentPage - 1) * itemsPerPage;
+      if (isSuper) {
+        return apiClient.api.tickets.ticketsGetAllTickets({ skip, limit: itemsPerPage, status: statusFilter || undefined, priority: priorityFilter || undefined });
+      }
+      return apiClient.api.tickets.ticketsGetMyTickets({ skip, limit: itemsPerPage, status: statusFilter || undefined });
+    },
+    staleTime: 60_000,
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async (payload: TicketCreate) => apiClient.api.tickets.ticketsCreateTicket({ ticketCreate: payload }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['tickets'] });
+      setModalMode('view');
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, update }: { id: string; update: TicketUpdate }) => apiClient.api.tickets.ticketsUpdateTicket({ ticketId: id, ticketUpdate: update }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['tickets'] });
+      setModalMode('view');
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => apiClient.api.tickets.ticketsDeleteTicket({ ticketId: id }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['tickets'] }),
+  });
+
   // ──────────────────────────────────────────────────────────────────────
   // Handlers
   // ──────────────────────────────────────────────────────────────────────
-  const openModal = useCallback((ticket: Ticket | null, mode: ModalMode) => {
+  const openModal = useCallback((ticket: TicketPublic | null, mode: ModalMode) => {
     setSelectedTicket(ticket);
     setModalMode(mode);
     if (ticket) {
       setFormData({
-        title: ticket.title,
+        subject: ticket.subject,
         description: ticket.description,
-        status: ticket.status,
-        priority: ticket.priority,
-        assignee: ticket.assignee,
+        status: (ticket.status ?? 'open') as NonNullable<TicketPublic['status']>,
+        priority: (ticket.priority ?? 'medium') as NonNullable<TicketPublic['priority']>,
+        assignedTo: ticket.assignedTo ?? '',
       });
     } else {
-      setFormData({ title: '', description: '', status: 'open', priority: 'medium', assignee: '' });
+      setFormData({ subject: '', description: '', status: 'open', priority: 'medium', assignedTo: '' });
     }
-    setIsLoading(false);
   }, []);
 
-  const handleCreate = () => {
-    if (!formData.title.trim() || !formData.description.trim()) return;
-    const newTicket: Ticket = {
-      id: Date.now(),
-      title: formData.title,
+  const handleCreate = async () => {
+    if (!formData.subject.trim() || !formData.description.trim()) return;
+    const payload: TicketCreate = {
+      subject: formData.subject,
       description: formData.description,
-      status: formData.status,
       priority: formData.priority,
-      assignee: formData.assignee || 'Unassigned',
-      createdAt: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-      updatedAt: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+      category: undefined,
     };
-    setTickets(prev => [newTicket, ...prev]);
-    setModalMode('view');
+    await createMutation.mutateAsync(payload);
   };
 
-  const handleUpdate = () => {
+  const handleUpdate = async () => {
     if (!selectedTicket) return;
-    setTickets(prev => prev.map(t =>
-      t.id === selectedTicket.id
-        ? { ...t, ...formData, updatedAt: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) }
-        : t
-    ));
-    setModalMode('view');
+    if (!isSuper) return; // Only superadmin can update
+    const update: TicketUpdate = {
+      subject: formData.subject || undefined,
+      description: formData.description || undefined,
+      status: formData.status || undefined,
+      priority: formData.priority || undefined,
+      category: undefined,
+    };
+    await updateMutation.mutateAsync({ id: selectedTicket.id, update });
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!selectedTicket || !confirm('Delete this ticket?')) return;
-    setTickets(prev => prev.filter(t => t.id !== selectedTicket.id));
+    if (!isSuper) return; // Only superadmin can delete
+    await deleteMutation.mutateAsync(selectedTicket.id);
     setSelectedTicket(null);
     setModalMode('view');
   };
@@ -157,19 +139,19 @@ export default function TicketsPage() {
   // Filter & Pagination
   // ──────────────────────────────────────────────────────────────────────
   const filteredTickets = useMemo(() => {
-    return tickets.filter(t =>
-      t.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      t.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      t.assignee.toLowerCase().includes(searchTerm.toLowerCase())
+    const data = ticketsQuery.data?.data ?? [];
+    if (!searchTerm.trim()) return data;
+    const q = searchTerm.toLowerCase();
+    return data.filter(t =>
+      t.subject.toLowerCase().includes(q) ||
+      t.description.toLowerCase().includes(q) ||
+      (t.assignedTo ?? '').toLowerCase().includes(q)
     );
-  }, [tickets, searchTerm]);
+  }, [ticketsQuery.data, searchTerm]);
 
-  const paginatedTickets = useMemo(() => {
-    const start = (currentPage - 1) * itemsPerPage;
-    return filteredTickets.slice(start, start + itemsPerPage);
-  }, [filteredTickets, currentPage]);
+  const paginatedTickets = filteredTickets; // already server-paginated, optionally filtered within page
 
-  const totalPages = Math.ceil(filteredTickets.length / itemsPerPage);
+  const totalPages = Math.ceil((ticketsQuery.data?.count ?? 0) / itemsPerPage) || 1;
 
   // ──────────────────────────────────────────────────────────────────────
   // Render
@@ -187,34 +169,46 @@ export default function TicketsPage() {
         {/* Header */}
         <div className="mb-6 flex items-center justify-between">
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-            Tickets ({filteredTickets.length})
+            Tickets ({ticketsQuery.data?.count ?? 0})
           </h2>
-          <div className="flex items-center gap-4">
-            <div className="relative max-w-xs">
-              <input
+          <div className="flex items-center gap-4 w-auto">
+              <Input
                 type="text"
-                placeholder="Search tickets..."
+                placeholder="Search Tickets..."
                 value={searchTerm}
                 onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-                className="w-full pl-10 pr-4 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 dark:bg-white/5 dark:border-gray-700 dark:text-white dark:placeholder-gray-400 transition-all duration-200"
+                className="w-auto pl-10 pr-4 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 dark:bg:white/5 dark:border-gray-700 dark:text-white dark:placeholder-gray-400 transition-all duration-200"
               />
-            </div>
+            
+            <Select
+              value={statusFilter}
+              onChange={(v) => { setStatusFilter(v); setCurrentPage(1); }}
+              options={[{ value: '', label: 'All Status' }, { value: 'open', label: 'Open' }, { value: 'in-progress', label: 'In Progress' }, { value: 'resolved', label: 'Resolved' }, { value: 'closed', label: 'Closed' }]}
+             className="w-auto"
+           />
+            {isSuper && (
+              <Select
+                value={priorityFilter}
+                onChange={(v) => { setPriorityFilter(v); setCurrentPage(1); }}
+                options={[{ value: '', label: 'All Priority' }, { value: 'low', label: 'Low' }, { value: 'medium', label: 'Medium' }, { value: 'high', label: 'High' }, { value: 'urgent', label: 'Urgent' }]}
+              />
+            )}
             <Button
               onClick={() => openModal(null, 'create')}
               startIcon={<Plus className="w-4 h-4" />}
               size="md"
               variant="primary"
+              
             >
-              New Ticket
+              Ticket
             </Button>
           </div>
         </div>
 
-        {/* Tickets Grid */}
+        {/* Tickets Grid (no skeletons; buttons handle loading) */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 mb-8">
-          {isLoading ? (
-            <SkeletonTicket />
-          ) : paginatedTickets.length === 0 ? (
+          {ticketsQuery.isLoading && !ticketsQuery.data ? null :
+          (paginatedTickets.length === 0 ? (
             <p className="col-span-full text-center text-gray-500 dark:text-gray-400 py-10">
               No tickets found.
             </p>
@@ -223,18 +217,18 @@ export default function TicketsPage() {
               <div
                 key={ticket.id}
                 onClick={() => openModal(ticket, 'view')}
-                className="group cursor-pointer rounded-2xl border border-gray-200 bg-white p-5 transition-all hover:shadow-md dark:border-white/10 dark:bg-white/3"
+                className="group cursor-pointer rounded-2xl border border-gray-200  p-5 transition-all hover:shadow-md dark:border-white/10 dark:bg:white/3"
               >
                 <div className="flex items-start justify-between mb-3">
                   <h3 className="font-semibold text-gray-900 dark:text-white line-clamp-2">
-                    {ticket.title}
+                    {ticket.subject}
                   </h3>
                   <Badge
                     size="sm"
                     color={
                       ticket.status === 'open' ? 'warning' :
                       ticket.status === 'in-progress' ? 'info' :
-                      ticket.status === 'resolved' ? 'success' : 'gray'
+                      ticket.status === 'resolved' ? 'success' : 'light'
                     }
                   >
                     {ticket.status}
@@ -244,40 +238,46 @@ export default function TicketsPage() {
                   {ticket.description}
                 </p>
                 <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-                  <span>{ticket.assignee}</span>
-                  <span>{ticket.createdAt}</span>
+                  <span>{ticket.assignedTo ?? 'Unassigned'}</span>
+                  <span>{new Date(ticket.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
                 </div>
                 <div className="mt-3 flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={(e) => { e.stopPropagation(); openModal(ticket, 'edit'); }}
-                    startIcon={<Edit2 className="w-4 h-4" />}
-                  >
-                    Edit
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={(e) => { e.stopPropagation(); handleDelete(); }}
-                    startIcon={<Trash2 className="w-4 h-4" />}
-                  >
-                    Delete
-                  </Button>
+                  {isSuper && (
+                    <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={(e) => { e.stopPropagation(); openModal(ticket, 'edit'); }}
+                        startIcon={<Edit2 className="w-4 h-4" />}
+                      >
+                        Edit
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={(e) => { e.stopPropagation(); handleDelete(); }}
+                        isLoading={deleteMutation.isPending}
+                        startIcon={<Trash2 className="w-4 h-4" />}
+                      >
+                        Delete
+                      </Button>
+                    </>
+                  )}
                 </div>
               </div>
             ))
-          )}
+          ))}
         </div>
 
         {/* Pagination */}
-        {totalPages > 1 && !isLoading && (
+        {totalPages > 1 && !ticketsQuery.isLoading && (
           <div className="flex items-center justify-center gap-3">
             <Button
               variant="outline"
               size="sm"
               onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
               disabled={currentPage === 1}
+              isLoading={ticketsQuery.isFetching}
               startIcon={<ChevronLeft className="w-4 h-4" />}
             >
               Prev
@@ -290,6 +290,7 @@ export default function TicketsPage() {
               size="sm"
               onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
               disabled={currentPage === totalPages}
+              isLoading={ticketsQuery.isFetching}
               startIcon={<ChevronRight className="w-4 h-4" />}
             >
               Next
@@ -299,17 +300,17 @@ export default function TicketsPage() {
 
         {/* Ticket Modal */}
         {selectedTicket || modalMode === 'create' ? (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-999999 p-4">
             <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
               <div className="sticky top-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-white/10 p-6">
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
-                      {modalMode === 'create' ? 'New Ticket' : modalMode === 'edit' ? 'Edit Ticket' : selectedTicket?.title}
+                      {modalMode === 'create' ? 'New Ticket' : modalMode === 'edit' ? 'Edit Ticket' : selectedTicket?.subject}
                     </h3>
                     {selectedTicket && (
                       <p className="text-sm text-gray-500 dark:text-gray-400">
-                        ID: #{selectedTicket.id} • Updated: {selectedTicket.updatedAt}
+                        ID: #{selectedTicket.id} • Updated: {new Date(selectedTicket.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                       </p>
                     )}
                   </div>
@@ -328,11 +329,11 @@ export default function TicketsPage() {
                 {modalMode !== 'view' && (
                   <>
                     <div>
-                      <Label>Title</Label>
+                      <Label>Subject</Label>
                       <Input
-                        placeholder="Ticket title"
-                        value={formData.title}
-                        onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                        placeholder="Ticket subject"
+                        value={formData.subject}
+                        onChange={(e) => setFormData(prev => ({ ...prev, subject: e.target.value }))}
                         className="mt-1"
                       />
                     </div>
@@ -380,8 +381,8 @@ export default function TicketsPage() {
                       <Label>Assignee</Label>
                       <Input
                         placeholder="e.g., Support Team"
-                        value={formData.assignee}
-                        onChange={(e) => setFormData(prev => ({ ...prev, assignee: e.target.value }))}
+                        value={formData.assignedTo}
+                        onChange={(e) => setFormData(prev => ({ ...prev, assignedTo: e.target.value }))}
                         className="mt-1"
                       />
                     </div>
@@ -400,24 +401,24 @@ export default function TicketsPage() {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
                         <Label>Status</Label>
-                        <Badge color={selectedTicket.status === 'open' ? 'warning' : selectedTicket.status === 'in-progress' ? 'info' : selectedTicket.status === 'resolved' ? 'success' : 'gray'}>
+                        <Badge color={selectedTicket.status === 'open' ? 'warning' : selectedTicket.status === 'in-progress' ? 'info' : selectedTicket.status === 'resolved' ? 'success' : 'light'}>
                           {selectedTicket.status}
                         </Badge>
                       </div>
                       <div className="space-y-1">
                         <Label>Priority</Label>
-                        <Badge color={selectedTicket.priority === 'low' ? 'gray' : selectedTicket.priority === 'medium' ? 'info' : selectedTicket.priority === 'high' ? 'warning' : 'error'}>
+                        <Badge color={selectedTicket.priority === 'low' ? 'light' : selectedTicket.priority === 'medium' ? 'info' : selectedTicket.priority === 'high' ? 'warning' : 'error'}>
                           {selectedTicket.priority}
                         </Badge>
                       </div>
                     </div>
                     <div className="space-y-1">
                       <Label>Assignee</Label>
-                      <p className="text-sm text-gray-900 dark:text-white">{selectedTicket.assignee}</p>
+                      <p className="text-sm text-gray-900 dark:text-white">{selectedTicket.assignedTo ?? 'Unassigned'}</p>
                     </div>
                     <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
-                      <span>Created: {selectedTicket.createdAt}</span>
-                      <span>Updated: {selectedTicket.updatedAt}</span>
+                      <span>Created: {new Date(selectedTicket.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                      <span>Updated: {new Date(selectedTicket.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
                     </div>
                   </div>
                 )}
@@ -429,19 +430,21 @@ export default function TicketsPage() {
                       variant="primary"
                       size="md"
                       onClick={handleCreate}
-                      disabled={!formData.title.trim() || !formData.description.trim()}
+                      disabled={!formData.subject.trim() || !formData.description.trim()}
+                      isLoading={createMutation.isPending}
                       className="flex-1"
                     >
                       Create Ticket
                     </Button>
                   )}
-                  {modalMode === 'edit' && (
+                  {modalMode === 'edit' && isSuper && (
                     <>
                       <Button
                         variant="primary"
                         size="md"
                         onClick={handleUpdate}
-                        disabled={!formData.title.trim() || !formData.description.trim()}
+                        disabled={!formData.subject.trim() || !formData.description.trim()}
+                        isLoading={updateMutation.isPending}
                         className="flex-1"
                       >
                         Update Ticket
@@ -456,7 +459,7 @@ export default function TicketsPage() {
                       </Button>
                     </>
                   )}
-                  {modalMode === 'view' && selectedTicket && (
+                  {modalMode === 'view' && selectedTicket && isSuper && (
                     <>
                       <Button
                         variant="outline"
@@ -471,6 +474,7 @@ export default function TicketsPage() {
                         variant="outline"
                         size="md"
                         onClick={handleDelete}
+                        isLoading={deleteMutation.isPending}
                         className="flex-1"
                         startIcon={<Trash2 className="w-4 h-4" />}
                       >
@@ -485,27 +489,5 @@ export default function TicketsPage() {
         ) : null}
       </div>
     </div>
-  );
-}
-
-// ──────────────────────────────────────────────────────────────────────
-// Skeleton
-// ──────────────────────────────────────────────────────────────────────
-function SkeletonTicket() {
-  return (
-    <>
-      {[...Array(6)].map((_, i) => (
-        <div key={i} className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-white/10 dark:bg-white/3 animate-pulse">
-          <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded mb-3 w-3/4"></div>
-          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded mb-2 w-full"></div>
-          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
-          <div className="mt-4 flex justify-end gap-2">
-            <div className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
-            <div className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
-            <div className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
-          </div>
-        </div>
-      ))}
-    </>
   );
 }

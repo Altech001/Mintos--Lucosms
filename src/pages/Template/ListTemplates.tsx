@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import PageBreadcrumb from "../../components/common/PageBreadCrumb";
 import PageMeta from "../../components/common/PageMeta";
 import { Search, Plus, Edit2, Trash2, Copy, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -9,75 +9,128 @@ import Button from "../../components/ui/button/Button";
 import Switch from "../../components/form/switch/Switch";
 import Label from "../../components/form/Label";
 import Input from '../../components/form/input/InputField';
+import { apiClient } from "../../lib/api/client";
+import type { TemplateCreate, TemplateUpdate, TemplatesPublic, TemplatePublic } from "../../lib/api";
+import { useMutation, useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
+import useCustomToast from "../../hooks/useCustomToast";
+import Select from "../../components/form/Select";
 
-// Dummy data
-const dummyTemplates = [
-  { id: 1, name: "Welcome Message", content: "Hi {{name}}, welcome to our platform!", type: "custom" as const, isDefault: true, createdAt: "Oct 30, 2025" },
-  { id: 2, name: "Order Confirmation", content: "Your order #{{id}} is confirmed!", type: "prebuilt" as const, isDefault: false, createdAt: "Oct 29, 2025" },
-  { id: 3, name: "Password Reset", content: "Click to reset: {{link}}", type: "prebuilt" as const, isDefault: false, createdAt: "Oct 28, 2025" },
-  { id: 4, name: "Meeting Reminder", content: "Meeting at {{time}} with {{person}}", type: "custom" as const, isDefault: false, createdAt: "Oct 27, 2025" },
-  { id: 5, name: "Promo Code", content: "Use {{code}} for 20% off!", type: "custom" as const, isDefault: false, createdAt: "Oct 26, 2025" },
-];
+// API-backed implementation
 
 export default function ListTemplates() {
+  const queryClient = useQueryClient();
+  const { showSuccessToast, showErrorToast } = useCustomToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [templates, setTemplates] = useState<typeof dummyTemplates>([]);
+  const [editing, setEditing] = useState<null | { id: string; name: string; content: string; _default?: boolean; tag?: string }>(null);
   const itemsPerPage = 6;
 
   // Form state
   const [newName, setNewName] = useState('');
   const [newContent, setNewContent] = useState('');
   const [isDefault, setIsDefault] = useState(false);
+  const [tag, setTag] = useState('');
+  const [tagFilter, setTagFilter] = useState<string>("");
 
-  // Simulate API
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setTemplates(dummyTemplates);
-      setIsLoading(false);
-    }, 1200);
-    return () => clearTimeout(timer);
-  }, []);
+  // Queries
+  const templatesQuery = useQuery<TemplatesPublic>({
+    queryKey: ['templates', currentPage, itemsPerPage, tagFilter],
+    queryFn: async () => {
+      const skip = (currentPage - 1) * itemsPerPage;
+      return apiClient.api.templates.templatesReadTemplates({ skip, limit: itemsPerPage, tag: tagFilter || undefined });
+    },
+    placeholderData: keepPreviousData,
+    staleTime: 60_000,
+  });
+
+  const tagsQuery = useQuery<string[]>({
+    queryKey: ['templateTags'],
+    queryFn: async () => (await apiClient.api.templates.templatesGetTemplateTags()).filter((t): t is string => !!t),
+    staleTime: 5 * 60_000,
+  });
+
+  const templates = useMemo<TemplatePublic[]>(() => {
+    const data: TemplatePublic[] = templatesQuery.data?.data ?? [];
+    // There is no server search, do quick filter within the current page
+    if (!searchTerm.trim()) return data;
+    const q = searchTerm.toLowerCase();
+    return data.filter(t => t.name.toLowerCase().includes(q) || t.content.toLowerCase().includes(q));
+  }, [templatesQuery.data, searchTerm]);
 
   // Filter & Paginate
-  const filtered = useMemo(() => {
-    return templates.filter(t =>
-      t.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      t.content.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [templates, searchTerm]);
+  const paginated = templates; // already server-paginated, optionally filtered within page
+  const totalPages = Math.ceil((templatesQuery.data?.count ?? 0) / itemsPerPage) || 1;
 
-  const paginated = useMemo(() => {
-    const start = (currentPage - 1) * itemsPerPage;
-    return filtered.slice(start, start + itemsPerPage);
-  }, [filtered, currentPage]);
+  const createMutation = useMutation({
+    mutationFn: async (payload: TemplateCreate) => apiClient.api.templates.templatesCreateTemplate({ templateCreate: payload }),
+    onSuccess: () => {
+      showSuccessToast('Template created');
+      queryClient.invalidateQueries({ queryKey: ['templates'] });
+    },
+    onError: () => showErrorToast('Failed to create template'),
+  });
 
-  const totalPages = Math.ceil(filtered.length / itemsPerPage);
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, update }: { id: string; update: TemplateUpdate }) =>
+      apiClient.api.templates.templatesUpdateTemplate({ id, templateUpdate: update }),
+    onSuccess: () => {
+      showSuccessToast('Template updated');
+      queryClient.invalidateQueries({ queryKey: ['templates'] });
+    },
+    onError: () => showErrorToast('Failed to update template'),
+  });
 
-  const handleCreate = () => {
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => apiClient.api.templates.templatesDeleteTemplate({ id }),
+    onSuccess: () => {
+      showSuccessToast('Template deleted');
+      queryClient.invalidateQueries({ queryKey: ['templates'] });
+    },
+    onError: () => showErrorToast('Failed to delete template'),
+  });
+
+  const setDefaultMutation = useMutation({
+    mutationFn: async ({ id, setDefault }: { id: string; setDefault: boolean }) =>
+      setDefault
+        ? apiClient.api.templates.templatesSetTemplateAsDefault({ id })
+        : apiClient.api.templates.templatesUnsetTemplateAsDefault({ id }),
+    onSuccess: () => {
+      showSuccessToast('Default template updated');
+      queryClient.invalidateQueries({ queryKey: ['templates'] });
+    },
+    onError: () => showErrorToast('Failed to update default state'),
+  });
+
+  const handleCreate = async () => {
     if (!newName.trim() || !newContent.trim()) return;
-    const newTemplate = {
-      id: Date.now(),
-      name: newName,
-      content: newContent,
-      type: 'custom' as const,
-      isDefault,
-      createdAt: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-    };
-    setTemplates(prev => [newTemplate, ...prev]);
+    const payload: TemplateCreate = { name: newName, content: newContent, _default: isDefault, tag: tag || undefined };
+    await createMutation.mutateAsync(payload);
     setIsModalOpen(false);
     setNewName('');
     setNewContent('');
     setIsDefault(false);
+    setTag('');
   };
 
-  const toggleDefault = (id: number) => {
-    setTemplates(prev => prev.map(t =>
-      t.id === id ? { ...t, isDefault: !t.isDefault } : { ...t, isDefault: false }
-    ));
+  const handleUpdate = async () => {
+    if (!editing) return;
+    const update: TemplateUpdate = {
+      name: newName || undefined,
+      content: newContent || undefined,
+      _default: isDefault,
+      tag: tag || undefined,
+    };
+    await updateMutation.mutateAsync({ id: editing.id, update });
+    setIsModalOpen(false);
+    setEditing(null);
+    setNewName('');
+    setNewContent('');
+    setIsDefault(false);
+    setTag('');
   };
+
+  //
 
   return (
     <div>
@@ -91,22 +144,39 @@ export default function ListTemplates() {
 
         {/* Header */}
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="relative max-w-xs">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-100" />
-            <Input
-              type="text"
-              placeholder="Search templates..."
-              value={searchTerm}
-              onChange={(e) => {
-                setSearchTerm(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="pl-10"
-            />
+          <div className="flex gap-3 w-full sm:w-auto">
+            <div className="relative max-w-xs w-full">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-100" />
+              <Input
+                type="text"
+                placeholder="Search templates..."
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="pl-10"
+              />
+            </div>
+            <div className="min-w-48">
+              <Select
+                options={[{ value: '', label: 'All tags' }, ...(tagsQuery.data?.map(t => ({ value: t, label: t })) ?? [])]}
+                placeholder="Filter by tag"
+                defaultValue={""}
+                onChange={(value) => { setTagFilter(value); setCurrentPage(1); }}
+              />
+            </div>
           </div>
 
           <Button
-            onClick={() => setIsModalOpen(true)}
+            onClick={() => {
+              setEditing(null);
+              setNewName('');
+              setNewContent('');
+              setIsDefault(false);
+              setTag('');
+              setIsModalOpen(true);
+            }}
             size="md"
             className="flex items-center gap-2"
           >
@@ -117,7 +187,7 @@ export default function ListTemplates() {
 
         {/* Cards Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {isLoading ? (
+          {templatesQuery.isLoading && templates.length === 0 ? (
             <SkeletonGrid />
           ) : paginated.length === 0 ? (
             <p className="col-span-full text-center text-gray-500 dark:text-gray-400 py-10">
@@ -132,11 +202,11 @@ export default function ListTemplates() {
                 {/* Tag */}
                 <div className="absolute -top-3 left-4">
                   <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
-                    template.type === 'custom'
+                    (template.tag ?? 'custom') === 'custom'
                       ? 'bg-brand-100 text-brand-800 dark:bg-brand-900/20 dark:text-brand-300'
                       : 'bg-gray-100 text-gray-800 dark:bg-white/10 dark:text-gray-300'
                   }`}>
-                    {template.type}
+                    {template.tag ?? 'custom'}
                   </span>
                 </div>
 
@@ -144,7 +214,7 @@ export default function ListTemplates() {
                 <div className="mt-2 space-y-3">
                   <h3 className="font-semibold text-gray-900 dark:text-white">
                     {template.name}
-                    {template.isDefault && (
+                    {template._default && (
                       <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-brand-100 text-brand-800 dark:bg-brand-900/20 dark:text-brand-300">
                         Default
                       </span>
@@ -154,29 +224,48 @@ export default function ListTemplates() {
                     {template.content}
                   </p>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
-                    {template.createdAt}
+                    {new Date(template.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                   </p>
                 </div>
 
                 {/* Actions */}
                 <div className="mt-4 flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <button className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors" title="Edit">
+                    <button className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors" title="Edit"
+                      onClick={() => {
+                        setEditing({ id: template.id, name: template.name, content: template.content, _default: template._default, tag: template.tag });
+                        setNewName(template.name);
+                        setNewContent(template.content);
+                        setIsDefault(!!template._default);
+                        setTag(template.tag ?? '');
+                        setIsModalOpen(true);
+                      }}
+                    >
                       <Edit2 className="w-4 h-4" />
                     </button>
-                    <button className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors" title="Copy">
+                    <button className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors" title="Copy"
+                      onClick={async () => {
+                        await navigator.clipboard.writeText(template.content);
+                        showSuccessToast('Template content copied to clipboard');
+                      }}
+                    >
                       <Copy className="w-4 h-4" />
                     </button>
-                    <button className="p-1.5 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors" title="Delete">
+                    <button className="p-1.5 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors" title="Delete"
+                      onClick={async () => {
+                        if (confirm('Delete this template?')) {
+                          await deleteMutation.mutateAsync(template.id);
+                        }
+                      }}
+                    >
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
 
                   <Switch
                     label="Default"
-                    // checked={template.isDefault}
-                    onChange={() => toggleDefault(template.id)}
-                    // size="sm"
+                    defaultChecked={!!template._default}
+                    onChange={(checked: boolean) => setDefaultMutation.mutate({ id: template.id, setDefault: checked })}
                   />
                 </div>
               </div>
@@ -185,34 +274,44 @@ export default function ListTemplates() {
         </div>
 
         {/* Pagination */}
-        {totalPages > 1 && !isLoading && (
+        {totalPages > 1 && (
           <div className="mt-8 flex items-center justify-center gap-3">
-            <button
-              onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-              disabled={currentPage === 1}
-              className={`p-2 rounded-lg border ${currentPage === 1 ? 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed dark:border-gray-700 dark:bg-white/5' : 'border-gray-200 bg-white hover:bg-gray-50 dark:border-gray-700 dark:bg-white/5 dark:hover:bg-white/10'}`}
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              Page <span className="text-brand-600 dark:text-brand-400">{currentPage}</span> of {totalPages}
-            </span>
-            <button
-              onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-              disabled={currentPage === totalPages}
-              className={`p-2 rounded-lg border ${currentPage === totalPages ? 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed dark:border-gray-700 dark:bg-white/5' : 'border-gray-200 bg-white hover:bg-gray-50 dark:border-gray-700 dark:bg-white/5 dark:hover:bg-white/10'}`}
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
+            {templatesQuery.isFetching ? (
+              <div className="flex items-center gap-3">
+                <div className="h-9 w-9 rounded-lg bg-gray-200 dark:bg-gray-700 animate-pulse" />
+                <div className="h-5 w-40 rounded bg-gray-200 dark:bg-gray-700 animate-pulse" />
+                <div className="h-9 w-9 rounded-lg bg-gray-200 dark:bg-gray-700 animate-pulse" />
+              </div>
+            ) : (
+              <>
+                <button
+                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                  disabled={currentPage === 1}
+                  className={`p-2 rounded-lg border ${currentPage === 1 ? 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed dark:border-gray-700 dark:bg-white/5' : 'border-gray-200 bg-white hover:bg-gray-50 dark:border-gray-700 dark:bg-white/5 dark:hover:bg-white/10'}`}
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Page <span className="text-brand-600 dark:text-brand-400">{currentPage}</span> of {totalPages}
+                </span>
+                <button
+                  onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                  disabled={currentPage === totalPages}
+                  className={`p-2 rounded-lg border ${currentPage === totalPages ? 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed dark:border-gray-700 dark:bg-white/5' : 'border-gray-200 bg-white hover:bg-gray-50 dark:border-gray-700 dark:bg-white/5 dark:hover:bg-white/10'}`}
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </>
+            )}
           </div>
         )}
       </div>
 
-      {/* Create Modal */}
+      {/* Create/Edit Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl max-w-lg w-full p-6 space-y-5">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Create New Template</h3>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{editing ? 'Edit Template' : 'Create New Template'}</h3>
 
             <div>
               <Label>Name</Label>
@@ -231,13 +330,26 @@ export default function ListTemplates() {
                 onChange={setNewContent}
                 rows={5}
               />
+              <div className="mt-1 text-xs text-gray-500 dark:text-gray-400 flex items-center justify-between">
+                <span>Characters: {newContent.length}</span>
+                {/* Hint for SMS splitting could be added here if needed */}
+              </div>
+            </div>
+
+            <div>
+              <Label>Tag (optional)</Label>
+              <Input
+                placeholder="custom"
+                value={tag}
+                onChange={(e) => setTag(e.target.value)}
+              />
             </div>
 
             <div className="flex items-center justify-between">
               <Label>Set as Default</Label>
               <Switch
                 label=""
-                // checked={isDefault}
+                defaultChecked={isDefault}
                 onChange={setIsDefault}
               />
             </div>
@@ -250,10 +362,11 @@ export default function ListTemplates() {
                 Cancel
               </Button>
               <Button
-                onClick={handleCreate}
+                onClick={editing ? handleUpdate : handleCreate}
                 disabled={!newName.trim() || !newContent.trim()}
+                isLoading={createMutation.isPending || updateMutation.isPending}
               >
-                Create Template
+                {editing ? 'Save Changes' : 'Create Template'}
               </Button>
             </div>
           </div>

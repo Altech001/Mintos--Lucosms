@@ -1,70 +1,25 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
+
 'use client';
 
 import { AlertCircle, CheckCircle, ChevronLeft, ChevronRight, Copy, Grid3X3, Key, Plus, Table as TableIcon, Trash2, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { apiClient } from "../../lib/api/client";
+import type { ApiKeyPublic, ApiKeysPublic, ApiKeyCreate } from "../../lib/api";
 import PageBreadcrumb from "../../components/common/PageBreadCrumb";
 import PageMeta from "../../components/common/PageMeta";
 import Label from "../../components/form/Label";
 import Input from "../../components/form/input/InputField";
 import Button from "../../components/ui/button/Button";
 
-// ──────────────────────────────────────────────────────────────────────
-// Types
-// ──────────────────────────────────────────────────────────────────────
-interface ApiKey {
-  id: string;
-  name: string;
-  key: string;
-  prefix: string;
-  createdAt: string;
-  lastUsed?: string;
-  isActive: boolean;
-}
-
 type ViewMode = 'cards' | 'table';
-
 // ──────────────────────────────────────────────────────────────────────
-const generateKey = () => {
-  const prefix = 'sk_live_' + Math.random().toString(36).substring(2, 8);
-  const suffix = Math.random().toString(36).substring(2, 15);
-  return { prefix, full: prefix + '_' + suffix };
-};
-
-const dummyKeys: ApiKey[] = [
-  {
-    id: '1',
-    name: "Production API",
-    key: generateKey().full,
-    prefix: generateKey().prefix,
-    createdAt: "Oct 30, 2025",
-    lastUsed: "Oct 31, 2025",
-    isActive: true,
-  },
-  {
-    id: '2',
-    name: "Staging Environment",
-    key: generateKey().full,
-    prefix: generateKey().prefix,
-    createdAt: "Oct 28, 2025",
-    lastUsed: "Oct 30, 2025",
-    isActive: true,
-  },
-  {
-    id: '3',
-    name: "Old Key (Revoked)",
-    key: generateKey().full,
-    prefix: generateKey().prefix,
-    createdAt: "Sep 15, 2025",
-    lastUsed: undefined,
-    isActive: false,
-  },
-];
 
 // ──────────────────────────────────────────────────────────────────────
 export default function Developer() {
-  const [keys, setKeys] = useState<ApiKey[]>(dummyKeys);
-  const [selectedKey, setSelectedKey] = useState<ApiKey | null>(null);
+  const queryClient = useQueryClient();
+  const [selectedKey, setSelectedKey] = useState<ApiKeyPublic | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -75,24 +30,31 @@ export default function Developer() {
 
   const itemsPerPage = viewMode === 'cards' ? 6 : 10;
 
+  // Queries
+  const keysQuery = useQuery<ApiKeysPublic>({
+    queryKey: ['apiKeys', currentPage, itemsPerPage],
+    queryFn: async () => {
+      const skip = (currentPage - 1) * itemsPerPage;
+      return apiClient.api.apiKeys.apiKeysReadApiKeys({ skip, limit: itemsPerPage });
+    },
+    staleTime: 60_000,
+  });
+
   // Handlers
-  const handleCreateKey = () => {
+  const createMutation = useMutation({
+    mutationFn: async (payload: ApiKeyCreate) => apiClient.api.apiKeys.apiKeysCreateApiKey({ apiKeyCreate: payload }),
+    onSuccess: (created) => {
+      void queryClient.invalidateQueries({ queryKey: ['apiKeys'] });
+      setSelectedKey(created);
+      setIsCreateModalOpen(false);
+      setIsViewModalOpen(true);
+      setNewKeyName('');
+    },
+  });
+
+  const handleCreateKey = async () => {
     if (!newKeyName.trim()) return;
-    const { prefix, full } = generateKey();
-    const newKey: ApiKey = {
-      id: Date.now().toString(),
-      name: newKeyName,
-      key: full,
-      prefix,
-      createdAt: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-      lastUsed: undefined,
-      isActive: true,
-    };
-    setKeys(prev => [newKey, ...prev]);
-    setSelectedKey(newKey);
-    setIsCreateModalOpen(false);
-    setIsViewModalOpen(true);
-    setNewKeyName('');
+    await createMutation.mutateAsync({ name: newKeyName, isActive: true });
   };
 
   const handleCopy = async (key: string, id: string) => {
@@ -105,42 +67,63 @@ export default function Developer() {
     }
   };
 
-  const handleRevoke = (id: string) => {
+  const revokeMutation = useMutation({
+    mutationFn: async (id: string) => apiClient.api.apiKeys.apiKeysUpdateApiKey({ apiKeyId: id, apiKeyUpdate: { isActive: false } }),
+    onSuccess: (_, id) => {
+      void queryClient.invalidateQueries({ queryKey: ['apiKeys'] });
+      if (selectedKey?.id === id) setSelectedKey(prev => prev ? { ...prev, isActive: false } : prev);
+    },
+  });
+
+  const handleRevoke = async (id: string) => {
     if (!confirm('Revoke this API key?')) return;
-    setKeys(prev => prev.map(k => k.id === id ? { ...k, isActive: false, lastUsed: undefined } : k));
-    if (selectedKey?.id === id) {
-      setSelectedKey(prev => prev ? { ...prev, isActive: false } : null);
-    }
+    await revokeMutation.mutateAsync(id);
   };
 
-  const handleDelete = (id: string) => {
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => apiClient.api.apiKeys.apiKeysDeleteApiKey({ apiKeyId: id }),
+    onSuccess: (_, id) => {
+      void queryClient.invalidateQueries({ queryKey: ['apiKeys'] });
+      if (selectedKey?.id === id) {
+        setIsViewModalOpen(false);
+        setSelectedKey(null);
+      }
+    },
+  });
+
+  const handleDelete = async (id: string) => {
     if (!confirm('Delete this API key permanently?')) return;
-    setKeys(prev => prev.filter(k => k.id !== id));
-    if (selectedKey?.id === id) {
-      setIsViewModalOpen(false);
-      setSelectedKey(null);
-    }
+    await deleteMutation.mutateAsync(id);
   };
 
-  const openView = (key: ApiKey) => {
+  const openView = (key: ApiKeyPublic) => {
     setSelectedKey(key);
     setIsViewModalOpen(true);
   };
 
+  const regenerateMutation = useMutation({
+    mutationFn: async (id: string) => apiClient.api.apiKeys.apiKeysRegenerateApiKey({ apiKeyId: id }),
+    onSuccess: (updated) => {
+      // Regeneration returns a new plainKey once
+      setSelectedKey(updated);
+      void queryClient.invalidateQueries({ queryKey: ['apiKeys'] });
+    },
+  });
+
   // Filter & Pagination
   const filteredKeys = useMemo(() => {
-    return keys.filter(k =>
-      k.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      k.prefix.toLowerCase().includes(searchTerm.toLowerCase())
+    const data = keysQuery.data?.data ?? [];
+    if (!searchTerm.trim()) return data;
+    const q = searchTerm.toLowerCase();
+    return data.filter(k =>
+      k.name.toLowerCase().includes(q) ||
+      k.prefix.toLowerCase().includes(q)
     );
-  }, [keys, searchTerm]);
+  }, [keysQuery.data, searchTerm]);
 
-  const paginatedKeys = useMemo(() => {
-    const start = (currentPage - 1) * itemsPerPage;
-    return filteredKeys.slice(start, start + itemsPerPage);
-  }, [currentPage, itemsPerPage, filteredKeys]);
+  const paginatedKeys = filteredKeys; // server-paginated
 
-  const totalPages = Math.ceil(filteredKeys.length / itemsPerPage);
+  const totalPages = Math.ceil((keysQuery.data?.count ?? 0) / itemsPerPage) || 1;
 
   // ──────────────────────────────────────────────────────────────────────
   return (
@@ -157,7 +140,7 @@ export default function Developer() {
         <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-4">
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-              API Keys ({filteredKeys.length})
+              API Keys ({keysQuery.data?.count ?? 0})
             </h2>
             <div className="flex items-center gap-2">
               <Button
@@ -202,7 +185,21 @@ export default function Developer() {
         {/* Cards View */}
         {viewMode === 'cards' && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 mb-8">
-            {paginatedKeys.length === 0 ? (
+            {keysQuery.isLoading && !keysQuery.data ? (
+              <>
+                {[...Array(6)].map((_, i) => (
+                  <div key={i} className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-white/10 dark:bg-white/3 animate-pulse">
+                    <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded mb-3 w-3/4"></div>
+                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded mb-2 w-1/2"></div>
+                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/3"></div>
+                    <div className="mt-4 flex justify-end gap-2">
+                      <div className="w-20 h-8 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
+                      <div className="w-20 h-8 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
+                    </div>
+                  </div>
+                ))}
+              </>
+            ) : paginatedKeys.length === 0 ? (
               <p className="col-span-full text-center text-gray-500 dark:text-gray-400 py-10">
                 No API keys found.
               </p>
@@ -228,23 +225,23 @@ export default function Developer() {
                     </span>
                   </div>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Created: {key.createdAt}
-                    {key.lastUsed && ` • Last used: ${key.lastUsed}`}
+                    Created: {new Date(key.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                   </p>
 
                   <div className="mt-4 flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={(e: { stopPropagation: () => void; }) => { e.stopPropagation(); handleCopy(key.key, key.id); }}
+                      onClick={(e: { stopPropagation: () => void; }) => { e.stopPropagation(); handleCopy(key.prefix, key.id); }}
                       startIcon={copySuccess === key.id ? <CheckCircle className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
                     >
-                      {copySuccess === key.id ? 'Copied!' : 'Copy'}
+                      {copySuccess === key.id ? 'Copied!' : 'Copy Prefix'}
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={(e: { stopPropagation: () => void; }) => { e.stopPropagation(); handleRevoke(key.id); }}
+                      isLoading={revokeMutation.isPending}
                       startIcon={<AlertCircle className="w-4 h-4" />}
                       disabled={!key.isActive}
                     >
@@ -271,7 +268,25 @@ export default function Developer() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-white/5">
-                {paginatedKeys.length === 0 ? (
+                {keysQuery.isLoading && !keysQuery.data ? (
+                  <>
+                    {[...Array(5)].map((_, i) => (
+                      <tr key={i}>
+                        <td className="px-5 py-4"><div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-32 animate-pulse" /></td>
+                        <td className="px-5 py-4"><div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-24 animate-pulse" /></td>
+                        <td className="px-5 py-4"><div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-20 animate-pulse" /></td>
+                        <td className="px-5 py-4"><div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-28 animate-pulse" /></td>
+                        <td className="px-5 py-4">
+                          <div className="flex items-center gap-2">
+                            <div className="w-16 h-8 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse"></div>
+                            <div className="w-16 h-8 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse"></div>
+                            <div className="w-16 h-8 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse"></div>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </>
+                ) : paginatedKeys.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="px-5 py-8 text-center text-gray-500 dark:text-gray-400">
                       No API keys found.
@@ -298,23 +313,23 @@ export default function Developer() {
                         </span>
                       </td>
                       <td className="px-5 py-4 text-gray-500 dark:text-gray-400 text-sm">
-                        {key.createdAt}
-                        {key.lastUsed && <span className="block text-xs">Last: {key.lastUsed}</span>}
+                        {new Date(key.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                       </td>
                       <td className="px-5 py-4">
                         <div className="flex items-center gap-2">
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleCopy(key.key, key.id)}
+                            onClick={() => handleCopy(key.prefix, key.id)}
                             startIcon={copySuccess === key.id ? <CheckCircle className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
                           >
-                            {copySuccess === key.id ? 'Copied!' : 'Copy'}
+                            {copySuccess === key.id ? 'Copied!' : 'Copy Prefix'}
                           </Button>
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => handleRevoke(key.id)}
+                            isLoading={revokeMutation.isPending}
                             startIcon={<AlertCircle className="w-4 h-4" />}
                             disabled={!key.isActive}
                           >
@@ -339,13 +354,14 @@ export default function Developer() {
         )}
 
         {/* Pagination */}
-        {totalPages > 1 && (
+        {totalPages > 1 && !keysQuery.isLoading && (
           <div className="flex items-center justify-center gap-3">
             <Button
               variant="outline"
               size="sm"
               onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
               disabled={currentPage === 1}
+              isLoading={keysQuery.isFetching}
               startIcon={<ChevronLeft className="w-4 h-4" />}
             >
               Prev
@@ -358,6 +374,7 @@ export default function Developer() {
               size="sm"
               onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
               disabled={currentPage === totalPages}
+              isLoading={keysQuery.isFetching}
               startIcon={<ChevronRight className="w-4 h-4" />}
             >
               Next
@@ -390,6 +407,7 @@ export default function Developer() {
                   size="md"
                   onClick={handleCreateKey}
                   disabled={!newKeyName.trim()}
+                  isLoading={createMutation.isPending}
                 >
                   Create Key
                 </Button>
@@ -405,7 +423,7 @@ export default function Developer() {
               <div className="flex items-center justify-between mb-6">
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{selectedKey.name}</h3>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Created: {selectedKey.createdAt}</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Created: {new Date(selectedKey.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
                 </div>
                 <Button
                   variant="outline"
@@ -419,20 +437,26 @@ export default function Developer() {
 
               <div className="space-y-5">
                 <div className="bg-gray-50 dark:bg-white/5 rounded-lg p-4 border border-gray-200 dark:border-white/10">
-                  <Label>Full API Key (copy now — won’t be shown again)</Label>
-                  <div className="flex items-center gap-2 mt-1">
-                    <code className="flex-1 font-mono text-sm text-gray-800 dark:text-gray-200 bg-white dark:bg-gray-800 px-3 py-2 rounded border border-gray-300 dark:border-gray-700">
-                      {selectedKey.key}
-                    </code>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleCopy(selectedKey.key, selectedKey.id)}
-                      startIcon={copySuccess === selectedKey.id ? <CheckCircle className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
-                    >
-                      {copySuccess === selectedKey.id ? 'Copied!' : 'Copy'}
-                    </Button>
-                  </div>
+                  <Label>Full API Key</Label>
+                  {selectedKey.plainKey ? (
+                    <div className="flex items-center gap-2 mt-1">
+                      <code className="flex-1 font-mono text-sm text-gray-800 dark:text-gray-200 bg-white dark:bg-gray-800 px-3 py-2 rounded border border-gray-300 dark:border-gray-700">
+                        {selectedKey.plainKey}
+                      </code>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleCopy(selectedKey.plainKey || '', selectedKey.id)}
+                        startIcon={copySuccess === selectedKey.id ? <CheckCircle className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                      >
+                        {copySuccess === selectedKey.id ? 'Copied!' : 'Copy'}
+                      </Button>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
+                      The full key is only shown immediately after creation or regeneration. You can copy the prefix: <code className="px-1 py-0.5 rounded bg-gray-100 dark:bg-white/10">{selectedKey.prefix}</code>
+                    </p>
+                  )}
                 </div>
 
                 <div className="flex items-center justify-between">
@@ -442,12 +466,10 @@ export default function Developer() {
                       {selectedKey.isActive ? 'Active' : 'Revoked'}
                     </p>
                   </div>
-                  {selectedKey.lastUsed && (
-                    <div>
-                      <Label>Last Used</Label>
-                      <p className="text-sm text-gray-600 dark:text-gray-300">{selectedKey.lastUsed}</p>
-                    </div>
-                  )}
+                  <div>
+                    <Label>Created</Label>
+                    <p className="text-sm text-gray-600 dark:text-gray-300">{new Date(selectedKey.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+                  </div>
                 </div>
 
                 <div className="flex gap-3 pt-4 border-t border-gray-200 dark:border-white/10">
@@ -456,6 +478,7 @@ export default function Developer() {
                     size="md"
                     onClick={() => handleRevoke(selectedKey.id)}
                     disabled={!selectedKey.isActive}
+                    isLoading={revokeMutation.isPending}
                     className="flex-1"
                     startIcon={<AlertCircle className="w-4 h-4" />}
                   >
@@ -464,7 +487,18 @@ export default function Developer() {
                   <Button
                     variant="outline"
                     size="md"
+                    onClick={() => regenerateMutation.mutate(selectedKey.id)}
+                    isLoading={regenerateMutation.isPending}
+                    className="flex-1"
+                    startIcon={<Key className="w-4 h-4" />}
+                  >
+                    Regenerate Key
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="md"
                     onClick={() => handleDelete(selectedKey.id)}
+                    isLoading={deleteMutation.isPending}
                     className="flex-1"
                     startIcon={<Trash2 className="w-4 h-4" />}
                   >

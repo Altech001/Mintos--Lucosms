@@ -1,60 +1,45 @@
-'use client';
-
 import { CheckCircle, ChevronLeft, ChevronRight, Edit2, Plus, Trash2, Upload, UserPlus, Users, X } from 'lucide-react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import PageBreadcrumb from "../../components/common/PageBreadCrumb";
 import PageMeta from "../../components/common/PageMeta";
 import Label from "../../components/form/Label";
 import Input from '../../components/form/input/InputField';
 import Button from "../../components/ui/button/Button";
+import { apiClient } from "../../lib/api/client";
+import type { ContactCreate, ContactGroupsPublic, ContactsPublic } from "../../lib/api";
+import { useMutation, useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
+import Skeleton from "../../components/ui/Skeleton";
+import useCustomToast from "../../hooks/useCustomToast";
 
 // ──────────────────────────────────────────────────────────────────────
 // Types
 // ──────────────────────────────────────────────────────────────────────
 interface Contact {
-  id: number;
+  id: string;
   name: string;
   phone: string;
   email?: string;
 }
 
 interface Group {
-  id: number;
+  id: string;
   name: string;
   contactsCount: number;
   createdAt: string;
 }
 
-interface ContactsByGroup {
-  [groupId: number]: Contact[];
-}
-
 // ──────────────────────────────────────────────────────────────────────
-// Dummy Data
-// ──────────────────────────────────────────────────────────────────────
-const dummyGroups: Group[] = [
-  { id: 1, name: "VIP Customers", contactsCount: 45, createdAt: "Oct 30, 2025" },
-  { id: 2, name: "Newsletter Subscribers", contactsCount: 120, createdAt: "Oct 29, 2025" },
-  { id: 3, name: "Support Team", contactsCount: 8, createdAt: "Oct 28, 2025" },
-  { id: 4, name: "Marketing Leads", contactsCount: 67, createdAt: "Oct 27, 2025" },
-];
-
-const dummyContacts: ContactsByGroup = {
-  1: [
-    { id: 1, name: "John Doe", phone: "+1 234-567-8901", email: "john@example.com" },
-    { id: 2, name: "Jane Smith", phone: "+1 987-654-3210", email: "jane@example.com" },
-  ],
-  2: [
-    { id: 3, name: "Bob Johnson", phone: "+1 555-123-4567", email: "bob@example.com" },
-  ],
-};
+// API-backed state replaces dummy data
 
 // ──────────────────────────────────────────────────────────────────────
 // Main Component
 // ──────────────────────────────────────────────────────────────────────
 export default function ContactGroups() {
-  const [groups, setGroups] = useState<Group[]>(dummyGroups);
+  const queryClient = useQueryClient();
+  const { showSuccessToast, showErrorToast } = useCustomToast();
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [groupsCount, setGroupsCount] = useState(0);
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -65,6 +50,10 @@ export default function ContactGroups() {
   const [singleContact, setSingleContact] = useState({ name: '', phone: '', email: '' });
   const [activeTab, setActiveTab] = useState<'single' | 'excel'>('single');
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'success'>('idle');
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [groupContacts, setGroupContacts] = useState<Contact[]>([]);
+  const [groupContactsCount, setGroupContactsCount] = useState(0);
+  const [deletingGroupId, setDeletingGroupId] = useState<string | null>(null);
 
   const itemsPerPage = 8;
   const contactsPerPage = 5;
@@ -72,70 +61,190 @@ export default function ContactGroups() {
   // ──────────────────────────────────────────────────────────────────────
   // Handlers
   // ──────────────────────────────────────────────────────────────────────
-  const handleCreateGroup = () => {
+  const groupsQuery = useQuery<ContactGroupsPublic>({
+    queryKey: ['contactGroups', currentPage, itemsPerPage],
+    queryFn: async () => {
+      const skip = (currentPage - 1) * itemsPerPage;
+      return apiClient.api.contacts.contactsGetContactGroups({ skip, limit: itemsPerPage });
+    },
+    staleTime: 60_000,
+    placeholderData: keepPreviousData,
+  });
+
+  const deleteGroupMutation = useMutation({
+    mutationFn: async (groupId: string) =>
+      apiClient.api.contacts.contactsDeleteContactGroup({ groupId }),
+    onSuccess: () => {
+      showSuccessToast('Group deleted');
+      queryClient.invalidateQueries({ queryKey: ['contactGroups'] });
+    },
+    onError: () => showErrorToast('Failed to delete group'),
+  });
+
+  useEffect(() => {
+    const res = groupsQuery.data;
+    if (res) {
+      setGroups(
+        res.data.map(g => ({
+          id: g.id,
+          name: g.name,
+          contactsCount: g.contactCount ?? 0,
+          createdAt: new Date(g.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+        }))
+      );
+      setGroupsCount(res.count);
+    }
+  }, [groupsQuery.data]);
+
+  const createGroupMutation = useMutation({
+    mutationFn: async (name: string) =>
+      apiClient.api.contacts.contactsCreateContactGroup({ contactGroupCreate: { name } }),
+    onSuccess: () => {
+      showSuccessToast('Group created successfully');
+      queryClient.invalidateQueries({ queryKey: ['contactGroups'] });
+    },
+    onError: () => showErrorToast('Failed to create group'),
+  });
+
+  const handleCreateGroup = useCallback(async () => {
     if (!groupNameInput.trim()) return;
-    const newGroup: Group = {
-      id: Date.now(),
-      name: groupNameInput,
-      contactsCount: 0,
-      createdAt: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-    };
-    setGroups(prev => [newGroup, ...prev]);
+    await createGroupMutation.mutateAsync(groupNameInput);
     setGroupNameInput('');
     setIsCreateModalOpen(false);
-  };
+  }, [groupNameInput, createGroupMutation]);
 
-  const handleAddSingle = () => {
-    if (!singleContact.name || !singleContact.phone) return;
-    setGroups(prev => prev.map(g =>
-      g.id === selectedGroupForAdd?.id
-        ? { ...g, contactsCount: g.contactsCount + 1 }
-        : g
-    ));
-    setSingleContact({ name: '', phone: '', email: '' });
-  };
+  const contactsQuery = useQuery<ContactsPublic | null>({
+    queryKey: ['groupContacts', selectedGroup?.id, contactsPage, contactsPerPage],
+    queryFn: async () => {
+      if (!selectedGroup?.id) return null;
+      const skip = (contactsPage - 1) * contactsPerPage;
+      return apiClient.api.contacts.contactsGetGroupContacts({ groupId: selectedGroup.id, skip, limit: contactsPerPage });
+    },
+    enabled: !!selectedGroup?.id,
+    placeholderData: keepPreviousData,
+    staleTime: 60_000,
+  });
 
-  const onDrop = useCallback((acceptedFiles: File[]) => {
-    if (acceptedFiles.length === 0) return;
+  useEffect(() => {
+    const res = contactsQuery.data;
+    if (res) {
+      setGroupContacts(
+        res.data.map(c => ({
+          id: c.id,
+          name: c.name,
+          phone: c.phone,
+          email: c.email ?? undefined,
+        }))
+      );
+      setGroupContactsCount(res.count);
+    }
+  }, [contactsQuery.data]);
+
+  const createContactMutation = useMutation({
+    mutationFn: async (payload: ContactCreate) =>
+      apiClient.api.contacts.contactsCreateContact({ contactCreate: payload }),
+    onSuccess: () => {
+      showSuccessToast('Contact added');
+      queryClient.invalidateQueries({ queryKey: ['contactGroups'] });
+      queryClient.invalidateQueries({ queryKey: ['groupContacts'] });
+    },
+    onError: () => showErrorToast('Failed to add contact'),
+  });
+
+  const handleAddSingle = useCallback(async () => {
+    if (!singleContact.name || !singleContact.phone || !selectedGroupForAdd?.id) return;
+    const payload: ContactCreate = {
+      name: singleContact.name,
+      phone: singleContact.phone,
+      email: singleContact.email || undefined,
+      groupId: selectedGroupForAdd.id,
+    };
+    try {
+      await createContactMutation.mutateAsync(payload);
+      setSingleContact({ name: '', phone: '', email: '' });
+    } catch (e) {
+      console.error('Failed to add contact', e);
+    }
+  }, [singleContact, selectedGroupForAdd, createContactMutation]);
+
+  const bulkCreateMutation = useMutation({
+    mutationFn: async (payload: ContactCreate[]) =>
+      apiClient.api.contacts.contactsBulkCreateContacts({ contactCreate: payload }),
+    onSuccess: () => {
+      showSuccessToast('Imported contacts successfully');
+      queryClient.invalidateQueries({ queryKey: ['contactGroups'] });
+      queryClient.invalidateQueries({ queryKey: ['groupContacts'] });
+    },
+    onError: () => showErrorToast('Bulk import failed'),
+  });
+
+  const onDrop = useCallback(async (acceptedFiles: File[]) => {
+    if (acceptedFiles.length === 0 || !selectedGroupForAdd?.id) return;
     setUploadStatus('uploading');
-    setTimeout(() => {
-      const imported = Math.floor(Math.random() * 50) + 10;
-      setGroups(prev => prev.map(g =>
-        g.id === selectedGroupForAdd?.id
-          ? { ...g, contactsCount: g.contactsCount + imported }
-          : g
-      ));
+    setUploadProgress(0);
+    try {
+      const file = acceptedFiles[0];
+      const { read, utils } = await import('xlsx');
+      const arrayBuffer = await file.arrayBuffer();
+      const wb = read(arrayBuffer, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows: Array<{ Name?: string; name?: string; Phone?: string; phone?: string; Email?: string; email?: string }> = utils.sheet_to_json(ws);
+      const payload: ContactCreate[] = rows
+        .map((r) => ({
+          name: String(r.Name ?? r.name ?? '').trim(),
+          phone: String(r.Phone ?? r.phone ?? '').trim(),
+          email: r.Email ?? r.email ?? undefined,
+          groupId: selectedGroupForAdd.id,
+        }))
+        .filter((r) => r.name && r.phone);
+
+      if (payload.length === 0) throw new Error('No valid rows. Expected columns: Name, Phone, Email');
+      // fake progress while API runs
+      const iv = setInterval(() => {
+        setUploadProgress((p) => (p < 95 ? p + 5 : p));
+      }, 150);
+      await bulkCreateMutation.mutateAsync(payload);
+      clearInterval(iv);
       setUploadStatus('success');
+      setUploadProgress(100);
+      // refresh lists
       setTimeout(() => {
         setIsAddModalOpen(false);
         setUploadStatus('idle');
-      }, 1500);
-    }, 800);
-  }, [selectedGroupForAdd]);
+        setUploadProgress(0);
+      }, 1200);
+    } catch (e) {
+      console.error('Bulk import failed', e);
+      setUploadStatus('idle');
+      setUploadProgress(0);
+    }
+  }, [selectedGroupForAdd, bulkCreateMutation]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    accept: { 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx', '.xls'] },
+    accept: {
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
+      'application/vnd.ms-excel': ['.xls'],
+    },
     multiple: false,
   });
 
   // ──────────────────────────────────────────────────────────────────────
   // Pagination
   // ──────────────────────────────────────────────────────────────────────
-  const paginatedGroups = useMemo(() => {
-    const start = (currentPage - 1) * itemsPerPage;
-    return groups.slice(start, start + itemsPerPage);
-  }, [groups, currentPage]);
+  const paginatedGroups = useMemo(() => groups, [groups]);
 
-  const totalPages = Math.ceil(groups.length / itemsPerPage);
+  const totalPages = Math.ceil(groupsCount / itemsPerPage) || 1;
+  const paginatedContacts = groupContacts;
 
-  const groupContacts = selectedGroup ? dummyContacts[selectedGroup.id] || [] : [];
-  const paginatedContacts = useMemo(() => {
-    const start = (contactsPage - 1) * contactsPerPage;
-    return groupContacts.slice(start, start + contactsPerPage);
-  }, [groupContacts, contactsPage]);
+  const contactsTotalPages = Math.ceil(groupContactsCount / contactsPerPage) || 1;
 
-  const contactsTotalPages = Math.ceil(groupContacts.length / contactsPerPage);
+  useEffect(() => {
+    if (selectedGroup) {
+      setContactsPage(1);
+    }
+  }, [selectedGroup]);
+  // contactsQuery handles fetching on dependencies
 
   // ──────────────────────────────────────────────────────────────────────
   // Render
@@ -167,7 +276,21 @@ export default function ContactGroups() {
 
         {/* Groups Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 mb-8">
-          {paginatedGroups.map((group) => (
+          {groupsQuery.isLoading && groups.length === 0 ? (
+            Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-white/10 dark:bg-white/3">
+                <Skeleton className="h-5 w-1/2 mb-3" />
+                <Skeleton className="h-4 w-1/3 mb-2" />
+                <Skeleton className="h-3 w-1/4" />
+                <div className="mt-4 flex justify-end gap-2">
+                  <Skeleton className="h-8 w-20" />
+                  <Skeleton className="h-8 w-20" />
+                  <Skeleton className="h-8 w-20" />
+                </div>
+              </div>
+            ))
+          ) : (
+          paginatedGroups.map((group) => (
             <div
               key={group.id}
               onClick={() => setSelectedGroup(group)}
@@ -196,10 +319,19 @@ export default function ContactGroups() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={(e) => {
+                  isLoading={deletingGroupId === group.id && deleteGroupMutation.isPending}
+                  onClick={async (e) => {
                     e.stopPropagation();
                     if (confirm('Delete group?')) {
-                      setGroups(prev => prev.filter(g => g.id !== group.id));
+                      try {
+                        setDeletingGroupId(group.id);
+                        await deleteGroupMutation.mutateAsync(group.id);
+                        setDeletingGroupId(null);
+                        // Clamp current page if needed will be handled by query refetch
+                      } catch (err) {
+                        setDeletingGroupId(null);
+                        console.error('Failed to delete group', err);
+                      }
                     }
                   }}
                   startIcon={<Trash2 className="w-4 h-4" />}
@@ -220,7 +352,8 @@ export default function ContactGroups() {
                 </Button>
               </div>
             </div>
-          ))}
+          ))
+          )}
         </div>
 
         {/* Pagination */}
@@ -280,13 +413,23 @@ export default function ContactGroups() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 dark:divide-white/5">
-                      {paginatedContacts.map((contact) => (
-                        <tr key={contact.id} className="hover:bg-gray-50 dark:hover:bg-white/5">
-                          <td className="px-4 py-2 text-sm text-gray-900 dark:text-white">{contact.name}</td>
-                          <td className="px-4 py-2 text-sm text-gray-900 dark:text-white">{contact.phone}</td>
-                          <td className="px-4 py-2 text-sm text-gray-900 dark:text-white">{contact.email || '-'}</td>
-                        </tr>
-                      ))}
+                      {contactsQuery.isLoading ? (
+                        Array.from({ length: 5 }).map((_, i) => (
+                          <tr key={i}>
+                            <td className="px-4 py-2"><Skeleton className="h-4 w-40" /></td>
+                            <td className="px-4 py-2"><Skeleton className="h-4 w-32" /></td>
+                            <td className="px-4 py-2"><Skeleton className="h-4 w-52" /></td>
+                          </tr>
+                        ))
+                      ) : (
+                        paginatedContacts.map((contact) => (
+                          <tr key={contact.id} className="hover:bg-gray-50 dark:hover:bg-white/5">
+                            <td className="px-4 py-2 text-sm text-gray-900 dark:text-white">{contact.name}</td>
+                            <td className="px-4 py-2 text-sm text-gray-900 dark:text-white">{contact.phone}</td>
+                            <td className="px-4 py-2 text-sm text-gray-900 dark:text-white">{contact.email || '-'}</td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -297,7 +440,7 @@ export default function ContactGroups() {
                       variant="outline"
                       size="sm"
                       onClick={() => setContactsPage(Math.max(1, contactsPage - 1))}
-                      disabled={contactsPage === 1}
+                      disabled={contactsPage === 1 || contactsQuery.isFetching}
                       startIcon={<ChevronLeft className="w-4 h-4" />}
                     >
                       Previous
@@ -309,7 +452,7 @@ export default function ContactGroups() {
                       variant="outline"
                       size="sm"
                       onClick={() => setContactsPage(Math.min(contactsTotalPages, contactsPage + 1))}
-                      disabled={contactsPage === contactsTotalPages}
+                      disabled={contactsPage === contactsTotalPages || contactsQuery.isFetching}
                       startIcon={<ChevronRight className="w-4 h-4" />}
                     >
                       Next
@@ -323,6 +466,7 @@ export default function ContactGroups() {
                   className="w-full"
                   variant="primary"
                   size="md"
+                  isLoading={false}
                   onClick={() => {
                     setSelectedGroup(null);
                     setSelectedGroupForAdd(selectedGroup);
@@ -361,6 +505,7 @@ export default function ContactGroups() {
                   size="md"
                   onClick={handleCreateGroup}
                   disabled={!groupNameInput.trim()}
+                  isLoading={createGroupMutation.isPending}
                 >
                   Create Group
                 </Button>
@@ -378,10 +523,9 @@ export default function ContactGroups() {
                   Add to <span className="text-brand-600 dark:text-brand-400">{selectedGroupForAdd.name}</span>
                 </h3>
                 <Button
-                children= ""
                   variant="outline"
                   size="sm"
-                  onClick={() => { setIsAddModalOpen(false); setUploadStatus('idle'); }}
+                  onClick={() => { setIsAddModalOpen(false); setUploadStatus('idle'); setUploadProgress(0); setSingleContact({ name: '', phone: '', email: '' }); }}
                   startIcon={<X className="w-5 h-5" />}
                 />
               </div>
@@ -445,6 +589,7 @@ export default function ContactGroups() {
                     size="md"
                     onClick={handleAddSingle}
                     disabled={!singleContact.name || !singleContact.phone}
+                    isLoading={createContactMutation.isPending}
                     className="w-full"
                   >
                     Add Contact
@@ -473,9 +618,12 @@ export default function ContactGroups() {
                       </>
                     )}
                     {uploadStatus === 'uploading' && (
-                      <div className="flex flex-col items-center">
+                      <div className="flex flex-col items-center w-full">
                         <div className="animate-spin rounded-full h-8 w-8 border-2 border-brand-600 border-t-transparent"></div>
                         <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">Importing contacts...</p>
+                        <div className="w-full mt-3 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                          <div className="h-2 bg-brand-600 transition-all" style={{ width: `${uploadProgress}%` }}></div>
+                        </div>
                       </div>
                     )}
                     {uploadStatus === 'success' && (

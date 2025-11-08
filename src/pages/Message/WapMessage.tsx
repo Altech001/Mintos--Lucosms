@@ -1,10 +1,11 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
 import {
   AlertTriangle,
   BrushCleaning,
   CheckCircle,
-  ChevronLeft,
   ChevronRight,
   CloudUploadIcon,
   Eye,
@@ -18,17 +19,20 @@ import {
   X,
 } from "lucide-react";
 import type React from "react";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useDropzone } from "react-dropzone";
-import * as XLSX from "xlsx";
+import { parsePhoneNumberFromString } from "libphonenumber-js";
 import ComponentCard from "../../components/common/ComponentCard";
 import PageBreadcrumb from "../../components/common/PageBreadCrumb";
 import PageMeta from "../../components/common/PageMeta";
 import Input from "../../components/form/input/InputField";
-import Button from "../../components/ui/button/Button";
-import { TrashBinIcon } from "../../icons";
 import Badge from "../../components/ui/badge/Badge";
+import Button from "../../components/ui/button/Button";
 import { Modal } from "../../components/ui/modal";
+import useCustomToast from "../../hooks/useCustomToast";
+import { TrashBinIcon } from "../../icons";
+import type { ContactGroupsPublic, TemplatePublic, TemplatesPublic } from "../../lib/api";
+import { apiClient } from "../../lib/api/client";
 
 // ──────────────────────────────────────────────────────────────────────
 // Types
@@ -112,6 +116,7 @@ const ColorVariants = [
 // Main Component
 // ──────────────────────────────────────────────────────────────────────
 export default function ComposePage() {
+  const { showSuccessToast, showErrorToast } = useCustomToast();
   const [groups, setGroups] = useState<ContactGroup[]>([]);
   const [totalContacts, setTotalContacts] = useState<number>(0);
   const [selectedGroups, setSelectedGroups] = useState<Set<string>>(new Set());
@@ -129,11 +134,83 @@ export default function ComposePage() {
   const [messageSegments, setMessageSegments] = useState<string[]>([]);
   const [showOverflowModal, setShowOverflowModal] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
-  const [templateIndex, setTemplateIndex] = useState(0);
-  
+  const [showGroupImport, setShowGroupImport] = useState(false);
+  const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
+  const [showChooseBatch, setShowChooseBatch] = useState(false);
+  const [isGroupImporting, setIsGroupImporting] = useState(false);
+  const templatesScrollerRef = useRef<HTMLDivElement>(null);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const [senderId, setSenderId] = useState<string>("");
 
-  const balance = 730;
-  const costPerSms = 32;
+  // Helpers: API error handling
+  const isAuthError = (err: unknown) => {
+    if (typeof err === 'object' && err !== null) {
+      const obj = err as Record<string, unknown>;
+      const status = typeof obj.status === 'number' ? obj.status : undefined;
+      const msg = typeof obj.message === 'string' ? obj.message : undefined;
+      if (status === 401 || status === 403) return true;
+      if (msg && /(401|403|unauthor)/i.test(msg)) return true;
+    }
+    return false;
+  };
+
+  const errorMessage = (err: unknown, fallback = 'Something went wrong') => {
+    if (typeof err === 'string') return err;
+    if (typeof err === 'object' && err !== null) {
+      const obj = err as Record<string, unknown>;
+      if (typeof obj.message === 'string') return obj.message;
+    }
+    return fallback;
+  };
+
+  // Strict E.164 formatting using libphonenumber-js; enforce +256
+  const DEFAULT_CC = (import.meta as any).env?.VITE_DEFAULT_COUNTRY_CODE as string | undefined;
+  const normalizePhones = (raw: string[]): { valid: string[]; invalid: number } => {
+    const result = new Set<string>();
+    let invalid = 0;
+    for (const n of raw) {
+      let input = (n || '').toString().trim();
+      if (!input) { invalid++; continue; }
+      // Ensure plus-only starts or local digits
+      input = input.replace(/[^+\d]/g, '');
+      // Special pre-format rules for UG numbers as requested:
+      // - '7'       => '+2567'
+      // - starting with '7' => '+256' + rest
+      // - '256'     => '+2567'
+      // - starting with '256' (no plus) => '+' + rest
+      if (input === '7') {
+        input = '+2567';
+      } else if (/^7\d*/.test(input)) {
+        input = '+256' + input;
+      } else if (input === '256') {
+        input = '+2567';
+      } else if (/^256\d*/.test(input)) {
+        input = '+' + input;
+      }
+      try {
+        const pn = input.startsWith('+')
+          ? parsePhoneNumberFromString(input)
+          : parsePhoneNumberFromString((DEFAULT_CC || '+256') + input.replace(/^0+/, ''));
+        if (!pn || !pn.isValid()) { invalid++; continue; }
+        const e164 = pn.number; // already in +CCCxxxxxxxx format
+        if (!e164.startsWith('+256')) { invalid++; continue; }
+        result.add(e164);
+      } catch {
+        invalid++;
+      }
+    }
+    return { valid: Array.from(result), invalid };
+  };
+
+  // Fetch user stats (wallet balance and sms cost)
+  const statsQuery = useQuery({
+    queryKey: ["userStats"],
+    queryFn: async () => apiClient.api.userData.userDataGetUserStats(),
+    staleTime: 30_000,
+  });
+
+  const balance = Number(statsQuery.data?.walletBalance ?? 0);
+  const costPerSms = Number(statsQuery.data?.smsCost ?? 32);
   const charLimit = 160;
   const remaining = charLimit - message.length;
   const selectedContactCount = Array.from(selectedGroups).reduce(
@@ -142,10 +219,9 @@ export default function ComposePage() {
     },
     0
   );
-  const totalCost =
-    selectedContactCount *
-    (messageSegments.length + (message.length > 0 ? 1 : 0)) *
-    costPerSms;
+  const totalSegments = messageSegments.length + (message.trim().length > 0 ? 1 : 0);
+  const totalCost = selectedContactCount * totalSegments * costPerSms;
+  const isInsufficient = !statsQuery.isLoading && totalCost > balance;
 
   // ──────────────────────────────────────────────────────────────────────
   // File Import
@@ -153,7 +229,7 @@ export default function ComposePage() {
   const parseFile = useCallback((file: File) => {
     const reader = new FileReader();
 
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
         const data = e.target?.result;
         let contacts: Contact[] = [];
@@ -177,9 +253,10 @@ export default function ComposePage() {
             };
           });
         } else if (file.name.endsWith(".xlsx") || file.name.endsWith(".xls")) {
-          const workbook = XLSX.read(data, { type: "binary" });
+          const { read, utils } = await import("xlsx");
+          const workbook = read(data, { type: "binary" });
           const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-          const jsonData = XLSX.utils.sheet_to_json(worksheet) as Record<
+          const jsonData = utils.sheet_to_json(worksheet) as Record<
             string,
             string
           >[];
@@ -228,6 +305,73 @@ export default function ComposePage() {
     }
   }, []);
 
+  // ──────────────────────────────────────────────────────────────────────
+  // API Fetches: Templates and Contact Groups
+  // ──────────────────────────────────────────────────────────────────────
+  const templatesQuery = useQuery<TemplatesPublic>({
+    queryKey: ["templates", 0, 100],
+    queryFn: async () => apiClient.api.templates.templatesReadTemplates({ skip: 0, limit: 100 }),
+    staleTime: 60_000,
+  });
+
+  const contactGroupsQuery = useQuery<ContactGroupsPublic>({
+    queryKey: ["contactGroups"],
+    queryFn: async () => apiClient.api.contacts.contactsGetContactGroups({}),
+    enabled: showGroupImport,
+    staleTime: 60_000,
+  });
+
+  
+
+  const importContactsFromGroup = useCallback(async (backendGroupId: string) => {
+    // Fetch contacts for selected backend group (paginate if needed)
+    setIsGroupImporting(true);
+    try {
+      const limit = 1000;
+      // Single fetch first; expand if backend supports pagination total
+      const resp = await apiClient.api.contacts.contactsGetGroupContacts({ groupId: backendGroupId, skip: 0, limit });
+      const all = resp.data;
+
+      // Map to local Contact type
+      const imported: Contact[] = all.map((c) => ({
+        id: `api-${c.id}`,
+        name: (c.name || "N/A"),
+        phone: c.phone,
+        email: c.email || "",
+      }));
+
+      // Create batches of CHUNK_SIZE and append to existing groups
+      const newGroups: ContactGroup[] = [];
+      const existingCount = totalContacts;
+      for (let i = 0; i < imported.length; i += CHUNK_SIZE) {
+        const chunk = imported.slice(i, i + CHUNK_SIZE);
+        const startIndex = existingCount + i + 1;
+        const endIndex = existingCount + i + chunk.length;
+        newGroups.push({
+          id: `group-${groups.length + newGroups.length}`,
+          number: groups.length + newGroups.length + 1,
+          contacts: chunk,
+          startIndex,
+          endIndex,
+        });
+      }
+
+      if (newGroups.length > 0) {
+        setGroups(prev => [...prev, ...newGroups]);
+        setTotalContacts(prev => prev + imported.length);
+        showSuccessToast(`Imported ${imported.length} contacts in ${newGroups.length} batch(es).`);
+      } else {
+        showErrorToast("Selected group has no contacts to import.");
+      }
+      setShowGroupImport(false);
+    } catch (e) {
+      const err = e as Error;
+      showErrorToast(err.message || "Failed to import contacts from group.");
+    } finally {
+      setIsGroupImporting(false);
+    }
+  }, [groups.length, totalContacts, showSuccessToast, showErrorToast]);
+
   const onDrop = useCallback(
     (acceptedFiles: File[]) => {
       if (acceptedFiles.length > 0) {
@@ -273,6 +417,7 @@ export default function ComposePage() {
   const applyTemplate = (template: Template) => {
     setMessage(template.body);
     setShowTemplates(false);
+    setSelectedTemplateId(template.id);
   };
 
   const addManualContact = () => {
@@ -296,20 +441,52 @@ export default function ComposePage() {
       ]);
       setTotalContacts(1);
     } else {
-      const lastGroup = groups[groups.length - 1];
-      if (lastGroup.contacts.length < CHUNK_SIZE) {
-        lastGroup.contacts.push(newContact);
-        lastGroup.endIndex += 1;
-        setGroups([...groups]);
+      if (selectedBatchId) {
+        const idx = groups.findIndex(g => g.id === selectedBatchId);
+        if (idx >= 0) {
+          const target = groups[idx];
+          if (target.contacts.length < CHUNK_SIZE) {
+            target.contacts.push(newContact);
+            target.endIndex += 1;
+            setGroups([...groups]);
+          } else {
+            alert("Selected batch is full. Please choose another batch.");
+            return;
+          }
+        } else {
+          // fallback to last group
+          const lastGroup = groups[groups.length - 1];
+          if (lastGroup.contacts.length < CHUNK_SIZE) {
+            lastGroup.contacts.push(newContact);
+            lastGroup.endIndex += 1;
+            setGroups([...groups]);
+          } else {
+            const newGroup: ContactGroup = {
+              id: `group-${groups.length}`,
+              number: groups.length + 1,
+              contacts: [newContact],
+              startIndex: totalContacts + 1,
+              endIndex: totalContacts + 1,
+            };
+            setGroups([...groups, newGroup]);
+          }
+        }
       } else {
-        const newGroup: ContactGroup = {
-          id: `group-${groups.length}`,
-          number: groups.length + 1,
-          contacts: [newContact],
-          startIndex: totalContacts + 1,
-          endIndex: totalContacts + 1,
-        };
-        setGroups([...groups, newGroup]);
+        const lastGroup = groups[groups.length - 1];
+        if (lastGroup.contacts.length < CHUNK_SIZE) {
+          lastGroup.contacts.push(newContact);
+          lastGroup.endIndex += 1;
+          setGroups([...groups]);
+        } else {
+          const newGroup: ContactGroup = {
+            id: `group-${groups.length}`,
+            number: groups.length + 1,
+            contacts: [newContact],
+            startIndex: totalContacts + 1,
+            endIndex: totalContacts + 1,
+          };
+          setGroups([...groups, newGroup]);
+        }
       }
       setTotalContacts(totalContacts + 1);
     }
@@ -328,6 +505,8 @@ export default function ComposePage() {
     ) {
       setShowOverflowModal(true);
     } else if (newMessage.length <= CHARACTER_LIMIT) {
+      // If the user manually edits the message, treat it as a custom SMS
+      if (selectedTemplateId) setSelectedTemplateId(null);
       setMessage(newMessage);
     } else {
       alert(`Maximum ${MAX_TOTAL_SEGMENTS} segments allowed`);
@@ -341,133 +520,142 @@ export default function ComposePage() {
   };
 
   const sendMessages = async () => {
-    if (
-      selectedGroups.size === 0 ||
-      (message.trim() === "" && messageSegments.length === 0)
-    )
+    // Validate
+    const finalMessage = [...messageSegments, message].join("").trim();
+    if (selectedGroups.size === 0) {
+      showErrorToast("Please select at least one group.");
       return;
-
-    setIsSending(true);
-    setShowQueue(true);
-
-    const newQueue: QueueItem[] = Array.from(selectedGroups).map((groupId) => ({
-      id: `queue-${groupId}-${Date.now()}`,
-      groupId,
-      status: "pending" as const,
-      progress: 0,
-      sentCount: 0,
-      totalCount: groups.find((g) => g.id === groupId)?.contacts.length || 0,
-    }));
-
-    setQueue(newQueue);
-
-    for (let i = 0; i < newQueue.length; i++) {
-      const item = newQueue[i];
-      const group = groups.find((g) => g.id === item.groupId);
-      if (!group) continue;
-
-      item.status = "sending";
-      setQueue([...newQueue]);
-
-      for (let j = 0; j < group.contacts.length; j++) {
-        const contact = group.contacts[j];
-        item.currentContact = `${contact.name} (${contact.phone})`;
-        item.sentCount = j + 1;
-        item.progress = Math.round(((j + 1) / group.contacts.length) * 100);
-        setQueue([...newQueue]);
-        await new Promise((resolve) =>
-          setTimeout(resolve, 100 + Math.random() * 150)
-        );
-      }
-
-      item.status = "completed";
-      setQueue([...newQueue]);
+    }
+    if (finalMessage === "") {
+      showErrorToast("Message cannot be empty.");
+      return;
     }
 
-    await new Promise((resolve) => setTimeout(resolve, 3000));
-    setIsSending(false);
-    setTimeout(() => {
+    if (isInsufficient) {
+      showErrorToast("Insufficient balance to send these messages.");
+      return;
+    }
+
+    // Gather unique recipient numbers from selected groups
+    const selectedIds = new Set(selectedGroups);
+    const rawTo: string[] = groups
+      .filter((g) => selectedIds.has(g.id))
+      .flatMap((g) => g.contacts.map((c) => c.phone).filter(Boolean));
+    const { valid: to, invalid } = normalizePhones(rawTo);
+
+    if (to.length === 0) {
+      showErrorToast("No valid phone numbers found in the selected groups.");
+      return;
+    }
+
+    // Validate Sender ID (optional). Default if empty
+    const sid = (senderId.trim() || 'ATUpdates');
+    if (!/^[A-Za-z0-9]{3,11}$/.test(sid)) {
+      showErrorToast("Sender ID must be 3-11 alphanumeric characters.");
+      return;
+    }
+
+    setIsSending(true);
+    try {
+      await apiClient.api.sms.smsSendSms({
+        sendSMSRequest: {
+          to,
+          message: finalMessage,
+          templateId: selectedTemplateId || undefined,
+          from: sid,
+          enqueue: true,
+        },
+      });
+      if (invalid > 0) {
+        showSuccessToast(`Queued ${to.length} SMS. Skipped ${invalid} invalid number(s).`);
+      } else {
+        showSuccessToast(`Queued SMS to ${to.length} recipient(s).`);
+      }
+
+      // Reset state
       setMessage("");
+      setMessageSegments([]);
+      setSelectedTemplateId(null);
       setSelectedGroups(new Set());
       setQueue([]);
-      setShowQueue(false);
-    }, 500);
+      setSenderId("");
+    } catch (e) {
+      if (isAuthError(e)) {
+        showErrorToast("You must be signed in to send SMS.");
+      } else {
+        showErrorToast(errorMessage(e, "Failed to send SMS."));
+      }
+    } finally {
+      setIsSending(false);
+    }
   };
 
   const sendToSingle = async () => {
-    if (
-      !sendToSingleNumber.trim() ||
-      (message.trim() === "" && messageSegments.length === 0)
-    )
+    const finalMessage = [...messageSegments, message].join("").trim();
+    const toNumber = sendToSingleNumber.trim();
+    if (!toNumber) {
+      showErrorToast("Please enter a recipient number.");
       return;
-
-    setIsSending(true);
-    setShowQueue(true);
-
-    const queueItem: QueueItem = {
-      id: `single-${Date.now()}`,
-      groupId: "single",
-      status: "sending",
-      progress: 0,
-      sentCount: 0,
-      totalCount: 1,
-      currentContact: sendToSingleNumber,
-    };
-
-    setQueue([queueItem]);
-
-    for (let i = 0; i < 1; i++) {
-      queueItem.sentCount = i + 1;
-      queueItem.progress = 100;
-      setQueue([queueItem]);
-      await new Promise((resolve) =>
-        setTimeout(resolve, 500 + Math.random() * 300)
-      );
+    }
+    if (finalMessage === "") {
+      showErrorToast("Message cannot be empty.");
+      return;
     }
 
-    queueItem.status = "completed";
-    setQueue([queueItem]);
+    const required = totalSegments * costPerSms; // single recipient
+    if (required > balance) {
+      showErrorToast("Insufficient balance to send this message.");
+      return;
+    }
 
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-    setIsSending(false);
-    setSendToSingleNumber("");
-    setTimeout(() => {
+    // Validate Sender ID (optional). Default if empty
+    const sid = (senderId.trim() || 'ATUpdates');
+    if (!/^[A-Za-z0-9]{3,11}$/.test(sid)) {
+      showErrorToast("Sender ID must be 3-11 alphanumeric characters.");
+      return;
+    }
+
+    setIsSending(true);
+    try {
+      const normalized = normalizePhones([toNumber]);
+      if (normalized.valid.length === 0) {
+        showErrorToast("Invalid phone number.");
+        setIsSending(false);
+        return;
+      }
+      await apiClient.api.sms.smsSendSms({
+        sendSMSRequest: {
+          to: normalized.valid,
+          message: finalMessage,
+          templateId: selectedTemplateId || undefined,
+          from: sid,
+          enqueue: true,
+        },
+      });
+      showSuccessToast(`Queued SMS to ${normalized.valid[0]}.`);
+
+      setSendToSingleNumber("");
+      setMessage("");
+      setMessageSegments([]);
+      setSelectedTemplateId(null);
       setShowSendSingleModal(false);
       setQueue([]);
-      setShowQueue(false);
-    }, 500);
+    } catch (e) {
+      const err = e as Error;
+      showErrorToast(err.message || "Failed to send SMS.");
+    } finally {
+      setIsSending(false);
+    }
   };
 
   // ──────────────────────────────────────────────────────────────────────
-  // Dummy Data
-  // ──────────────────────────────────────────────────────────────────────
-
-  const dummyTemplates: Template[] = [
-    {
-      id: "1",
-      title: "Welcome",
-      body: "Welcome to our service! Enjoy 10% off your first purchase.",
-      category: "Promotions",
-    },
-    {
-      id: "2",
-      title: "Payment Reminder",
-      body: "Your invoice is due in 3 days. Pay now to avoid late fees.",
-      category: "Billing",
-    },
-    {
-      id: "3",
-      title: "Appointment",
-      body: "Your appointment is confirmed for tomorrow at 10 AM.",
-      category: "Reminders",
-    },
-    {
-      id: "4",
-      title: "Birthday",
-      body: "Happy Birthday! Here’s a special gift just for you.",
-      category: "Greetings",
-    },
-  ];
+  // Templates from API → map to local Template interface
+  const apiTemplates: Template[] = (templatesQuery.data?.data || []).map((t: TemplatePublic) => ({
+    id: t.id,
+    title: t.name,
+    body: t.content,
+    category: t.tag || "General",
+  }));
 
   // ──────────────────────────────────────────────────────────────────────
   // Render
@@ -485,7 +673,7 @@ export default function ComposePage() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* ────────────────────── LEFT: Groups ────────────────────── */}
             <div className="lg:col-span-1">
-              <div className="border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/3 rounded-2xl p-5 h-full flex flex-col">
+              <div className="border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/3 rounded-2xl p-5 h-full max-h-[75vh] flex flex-col">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-semibold text-gray-600 dark:text-gray-300">
                     Contacts ({groups.length})
@@ -590,6 +778,13 @@ export default function ComposePage() {
                       Use Template
                     </Button>
                     <Button
+                      onClick={() => setShowGroupImport(true)}
+                      variant="outline"
+                    >
+                      <Users className="w-4 h-4" />
+                      Import From Group
+                    </Button>
+                    <Button
                       onClick={() => setSelectedGroups(new Set())}
                       variant="outline"
                     >
@@ -612,7 +807,13 @@ export default function ComposePage() {
                         {selectedContactCount !== 1 ? "s" : ""} selected
                       </p>
                     </div>
-                    <div className="float-right gap-2 flex">
+                    <div className="float-right gap-2 flex items-center">
+                      <Input
+                        value={senderId}
+                        onChange={(e) => setSenderId(e.target.value)}
+                        placeholder="Sender ID (optional)"
+                        maxLength={11}
+                      />
                       <Button onClick={selectAllGroups} variant="outline">
                         <BrushCleaning className="w-6 h-6 text-gray-400 cursor-pointer float-right mr-2" />
                         {selectedGroups.size === groups.length
@@ -694,9 +895,12 @@ export default function ComposePage() {
                       {remaining < 0 ? "over" : "remaining"}
                     </span>
                     <span className="text-gray-400">Cost: {totalCost} UGX</span>
-                    <span className="text-gray-400">
+                    <span className={isInsufficient ? "text-red-400" : "text-gray-400"}>
                       Balance: {balance} UGX
                     </span>
+                    {isInsufficient && (
+                      <span className="text-red-500 font-medium">Insufficient balance</span>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-2">
@@ -712,7 +916,8 @@ export default function ComposePage() {
                       disabled={
                         isSending ||
                         selectedGroups.size === 0 ||
-                        (message.trim() === "" && messageSegments.length === 0)
+                        (message.trim() === "" && messageSegments.length === 0) ||
+                        isInsufficient
                       }
                       className="px-5 py-2 bg-brand-600 hover:bg-brand-700 disabled:bg-gray-600 text-white font-medium rounded-lg transition-colors flex items-center gap-2"
                     >
@@ -794,6 +999,12 @@ export default function ComposePage() {
                 placeholder="+256 700 123456 / 070 0123456"
               />
             </div>
+            {groups.length > 0 && (
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-gray-500">Optional: choose a batch to add this number</span>
+                <Button variant="outline" size="sm" onClick={() => setShowChooseBatch(true)}>Choose Batch</Button>
+              </div>
+            )}
             <div className="flex justify-end gap-3">
               <Button
                 onClick={() => {
@@ -812,6 +1023,34 @@ export default function ComposePage() {
               >
                 Add Contact
               </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Choose Batch Modal */}
+      {showChooseBatch && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-md w-full p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Select Batch</h3>
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {groups.map(g => (
+                <button
+                  key={g.id}
+                  onClick={() => { setSelectedBatchId(g.id); setShowChooseBatch(false); }}
+                  disabled={g.contacts.length >= CHUNK_SIZE}
+                  className={`w-full text-left p-3 rounded border ${selectedBatchId===g.id?"border-brand-500":"border-gray-300 dark:border-gray-700"} ${g.contacts.length>=CHUNK_SIZE?"opacity-50 cursor-not-allowed":"hover:bg-gray-50 dark:hover:bg-white/5"}`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium">Batch {g.number}</span>
+                    <span className="text-xs text-gray-500">{g.contacts.length}/{CHUNK_SIZE}</span>
+                  </div>
+                  <div className="text-xs text-gray-500">Range #{g.startIndex} - #{g.endIndex}</div>
+                </button>
+              ))}
+            </div>
+            <div className="flex justify-end gap-2 mt-4">
+              <Button variant="outline" onClick={() => setShowChooseBatch(false)}>Close</Button>
             </div>
           </div>
         </div>
@@ -895,42 +1134,43 @@ export default function ComposePage() {
         <ComponentCard title="Choose Your Template" desc="Templates from Archive.">
           <div className="p-8">
             <div className="relative">
-              <div className="flex overflow-x-auto gap-4 p-4 snap-x snap-mandatory scroll-smooth no-scrollbar">
-                {dummyTemplates.map((template) => (
+              <div
+                ref={templatesScrollerRef}
+                className="flex overflow-x-auto gap-4 p-4 snap-x snap-mandatory scroll-smooth no-scrollbar"
+              >
+                {templatesQuery.isLoading && (
+                  <div className="text-sm text-gray-400">Loading templates...</div>
+                )}
+                {!templatesQuery.isLoading && apiTemplates.length === 0 && (
+                  <div className="text-sm text-gray-400">No templates found.</div>
+                )}
+                {apiTemplates.map((template) => (
                   <div
                     key={template.id}
                     onClick={() => applyTemplate(template)}
-                    className="snap-center shrink-0 w-80 bg-gray-800 rounded-xl p-5 cursor-pointer hover:ring-2 hover:ring-brand-500 transition-all"
+                    className="snap-center shrink-0 w-72  border border-gray-700/60 rounded-xl p-4 cursor-pointer hover:border-brand-500/60 hover:shadow-md transition"
                   >
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="font-semibold text-white">
-                        {template.title}
-                      </h4>
-                      <Badge size="sm" color="success">
-                        {template.category}
-                      </Badge>
-                    </div>
-                    <p className="text-sm text-gray-300 line-clamp-3">
-                      {template.body}
-                    </p>
+                    <div className="text-xs text-gray-600 dark:text-gray-300">{template.category}</div>
+                    <div className="text-gray-900 dark:text-gray-300 font-semibold">{template.title}</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-2 line-clamp-3">{template.body}</div>
                   </div>
                 ))}
               </div>
+              {/* Left arrow */}
               <button
-                onClick={() => setTemplateIndex(Math.max(0, templateIndex - 1))}
-                disabled={templateIndex === 0}
-                className="absolute left-0 top-1/2 -translate-y-1/2 bg-gray-800 p-2 rounded-full disabled:opacity-50"
+                type="button"
+                aria-label="Scroll templates left"
+                onClick={() => templatesScrollerRef.current?.scrollBy({ left: -320, behavior: 'smooth' })}
+                className="absolute left-0 top-1/2 -translate-y-1/2 bg-gray-800/80 hover:bg-brand-700 text-white p-2 rounded-full shadow focus:outline-none focus:ring-2 focus:ring-brand-500"
               >
-                <ChevronLeft className="w-5 h-5" />
+                <ChevronRight className="w-5 h-5 rotate-180" />
               </button>
+              {/* Right arrow */}
               <button
-                onClick={() =>
-                  setTemplateIndex(
-                    Math.min(dummyTemplates.length - 1, templateIndex + 1)
-                  )
-                }
-                disabled={templateIndex === dummyTemplates.length - 1}
-                className="absolute right-0 top-1/2 -translate-y-1/2 bg-gray-800 p-2 rounded-full disabled:opacity-50"
+                type="button"
+                aria-label="Scroll templates right"
+                onClick={() => templatesScrollerRef.current?.scrollBy({ left: 320, behavior: 'smooth' })}
+                className="absolute right-0 top-1/2 -translate-y-1/2 bg-gray-800/80 hover:bg-brand-700 text-white p-2 rounded-full shadow focus:outline-none focus:ring-2 focus:ring-brand-500"
               >
                 <ChevronRight className="w-5 h-5" />
               </button>
@@ -938,6 +1178,70 @@ export default function ComposePage() {
           </div>
         </ComponentCard>
       </Modal>
+
+      {/* ────────────────────── Group Import Modal ────────────────────── */}
+      {showGroupImport && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-2xl w-full p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Import From Contact Group</h3>
+              <button
+                onClick={() => setShowGroupImport(false)}
+                className="text-gray-500 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {contactGroupsQuery.isLoading && (
+              <div className="text-sm text-gray-400">Loading groups...</div>
+            )}
+
+            {contactGroupsQuery.isError && (
+              <div className="text-sm text-red-400">Failed to load groups.</div>
+            )}
+
+            {!contactGroupsQuery.isLoading && !contactGroupsQuery.isError && (
+              <div className="space-y-2 max-h-80 overflow-y-auto">
+                {(contactGroupsQuery.data?.data || []).length === 0 ? (
+                  <div className="text-sm text-gray-400">No groups available.</div>
+                ) : (
+                  (contactGroupsQuery.data?.data || []).map((g) => (
+                    <div
+                      key={g.id}
+                      className="p-3 rounded-xl border border-gray-200 dark:border-gray-700 flex items-center justify-between"
+                    >
+                      <div>
+                        <div className="font-medium text-gray-900 dark:text-white">{g.name}</div>
+                        {typeof g.contactCount === 'number' && (
+                          <div className="text-xs text-gray-500">{g.contactCount} contacts</div>
+                        )}
+                      </div>
+                      <Button
+                        onClick={() => importContactsFromGroup(g.id)}
+                        disabled={isGroupImporting}
+                        variant="outline"
+                      >
+                        {isGroupImporting ? (
+                          <>
+                            <Loader className="w-4 h-4 animate-spin" /> Importing...
+                          </>
+                        ) : (
+                          <>Import</>
+                        )}
+                      </Button>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2 mt-4">
+              <Button variant="outline" onClick={() => setShowGroupImport(false)}>Close</Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ────────────────────── Queue Modal ────────────────────── */}
       {showQueue && queue.length > 0 && (

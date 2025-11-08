@@ -113,7 +113,7 @@ const UgandaMap: React.FC<UgandaMapProps> = ({
                       <rect y="160" width="640" height="160" fill="#000"/>
                       <rect y="320" width="640" height="160" fill="#D21034"/>
                       <circle cx="320" cy="240" r="80" fill="#fff"/>
-                      <path d="M320 180v120M260 240h120" stroke="#000" stroke-width="20"/>
+                      <path d="M320 180v120M260 240h120" stroke="#000" strokeWidth="20"/>
                     </svg>
                   </span>
                   Kampala
@@ -133,7 +133,7 @@ const UgandaMap: React.FC<UgandaMapProps> = ({
             <rect y="160" width="640" height="160" fill="#000"/>
             <rect y="320" width="640" height="160" fill="#D21034"/>
             <circle cx="320" cy="240" r="80" fill="#fff"/>
-            <path d="M320 180v120M260 240h120" stroke="#000" stroke-width="20"/>
+            <path d="M320 180v120M260 240h120" stroke="#000" strokeWidth="20"/>
           </svg>
         </div>
         <span className="text-sm font-semibold text-gray-800 dark:text-white">Uganda</span>
