@@ -16,65 +16,46 @@ import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
 interface SMS {
-  id: number;
-  to: string;
+  id: string;
+  recipient: string;
   message: string;
-  status: "delivered" | "pending" | "failed";
-  date: string;
+  status: string;
+  sms_count: number;
+  cost: number;
+  template_id: string | null;
+  error_message: string | null;
+  delivery_status: string;
+  external_id: string | null;
+  created_at: string;
+  updated_at: string;
+  sent_at: string | null;
+  delivered_at: string | null;
+  user_id: string;
 }
 
 interface Props {
   searchTerm?: string;
   currentPage?: number;
   itemsPerPage?: number;
+  smsHistory?: SMS[];
+  isAdmin?: boolean;
 }
-
-const rawData: SMS[] = [
-  {
-    id: 1,
-    to: "+1 234-567-8901",
-    message: "Your verification code is 4821. Do not share it.",
-    status: "delivered",
-    date: "Oct 31, 2025, 10:30 AM",
-  },
-  {
-    id: 2,
-    to: "+1 987-654-3210",
-    message: "Meeting at 3 PM today. Don’t forget!",
-    status: "delivered",
-    date: "Oct 31, 2025, 09:15 AM",
-  },
-  {
-    id: 3,
-    to: "+1 555-123-4567",
-    message: "Your order #1234 has shipped!",
-    status: "pending",
-    date: "Oct 30, 2025, 04:20 PM",
-  },
-  {
-    id: 4,
-    to: "+1 444-999-8888",
-    message: "Payment failed.",
-    status: "failed",
-    date: "Oct 30, 2025, 01:10 PM",
-  },
-  {
-    id: 5,
-    to: "+1 777-222-1111",
-    message: "Welcome! Your account is now active.",
-    status: "delivered",
-    date: "Oct 29, 2025, 11:45 AM",
-  },
-];
 
 /* ------------------------------------------------------------------ */
 export default function BasicTableOne({
   searchTerm = "",
   currentPage = 1,
   itemsPerPage = 5,
+  smsHistory = [],
+  isAdmin = false,
 }: Props) {
-  const [data, setData] = useState<SMS[]>(rawData);
-  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [data, setData] = useState<SMS[]>(smsHistory);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  // Update data when smsHistory prop changes
+  useMemo(() => {
+    setData(smsHistory);
+  }, [smsHistory]);
 
   /* -------------------------- Filtering -------------------------- */
   const filtered = useMemo(() => {
@@ -82,9 +63,10 @@ export default function BasicTableOne({
     const lower = searchTerm.toLowerCase();
     return data.filter(
       (s) =>
-        s.to.includes(searchTerm) ||
-        s.message.toLowerCase().includes(lower) ||
-        s.status.includes(lower)
+        (s.recipient?.toLowerCase() || '').includes(lower) ||
+        (s.message?.toLowerCase() || '').includes(lower) ||
+        (s.status?.toLowerCase() || '').includes(lower) ||
+        (s.delivery_status?.toLowerCase() || '').includes(lower)
     );
   }, [data, searchTerm]);
 
@@ -93,8 +75,6 @@ export default function BasicTableOne({
     const start = (currentPage - 1) * itemsPerPage;
     return filtered.slice(start, start + itemsPerPage);
   }, [filtered, currentPage, itemsPerPage]);
-
-  const totalPages = Math.ceil(filtered.length / itemsPerPage);
 
   /* -------------------------- Selection -------------------------- */
   const allChecked =
@@ -109,14 +89,36 @@ export default function BasicTableOne({
     }
   };
 
-  const toggleRow = (id: number) => {
+  const toggleRow = (id: string) => {
     const copy = new Set(selected);
     if (copy.has(id)) copy.delete(id);
     else copy.add(id);
     setSelected(copy);
   };
 
-  const deleteRow = (id: number) => {
+  const deleteRow = async (id: string) => {
+    // Call API to delete
+    try {
+      const token = localStorage.getItem('access_token');
+      const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${baseUrl}/api/v1/historysms/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'accept': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      
+      if (!response.ok) {
+        toast.error('Failed to delete SMS');
+        return;
+      }
+    } catch {
+      toast.error('Error deleting SMS');
+      return;
+    }
+
+    // Update local state
     setData((prev) => prev.filter((s) => s.id !== id));
     setSelected((prev) => {
       const n = new Set(prev);
@@ -131,14 +133,35 @@ export default function BasicTableOne({
   };
 
   /* -------------------------- Bulk Delete -------------------------- */
-  const bulkDelete = () => {
+  const bulkDelete = async () => {
     if (selected.size === 0) return;
-    setData((prev) => prev.filter((s) => !selected.has(s.id)));
-    setSelected(new Set());
-    toast.success(`${selected.size} SMS deleted`, {
-      icon: <Trash2 className="w-4 h-4" />,
-      autoClose: 2000,
-    });
+    
+    try {
+      const token = localStorage.getItem('access_token');
+      const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      
+      // Delete all selected SMS
+      const deletePromises = Array.from(selected).map(id =>
+        fetch(`${baseUrl}/api/v1/historysms/${id}`, {
+          method: 'DELETE',
+          headers: {
+            'accept': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+        })
+      );
+      
+      await Promise.all(deletePromises);
+      
+      setData((prev) => prev.filter((s) => !selected.has(s.id)));
+      setSelected(new Set());
+      toast.success(`${selected.size} SMS deleted`, {
+        icon: <Trash2 className="w-4 h-4" />,
+        autoClose: 2000,
+      });
+    } catch {
+      toast.error('Error deleting SMS messages');
+    }
 
     setTimeout(() => {}, 2300);
   };
@@ -160,7 +183,7 @@ export default function BasicTableOne({
   const showViewToast = (sms: SMS) => {
     toast.info(
       <div className="flex flex-col gap-1">
-        <p className="font-medium">{sms.to}</p>
+        <p className="font-medium">{sms.recipient}</p>
         <p className="text-xs text-gray-600 dark:text-gray-300">
           {sms.message}
         </p>
@@ -175,14 +198,6 @@ export default function BasicTableOne({
     setTimeout(() => {}, 2300);
   };
 
-  const showResendToast = (to: string) => {
-    toast.success(`Resent to ${to}`, {
-      icon: <MessageSquare className="w-4 h-4" />,
-      autoClose: 2000,
-    });
-
-    setTimeout(() => {}, 2300);
-  };
 
   /* ------------------------------------------------------------------ */
   return (
@@ -287,7 +302,7 @@ export default function BasicTableOne({
 
                     <TableCell className="px-5 py-4 text-start">
                       <span className="font-medium text-gray-800 text-theme-sm dark:text-white/90">
-                        {sms.to}
+                        {sms.recipient}
                       </span>
                     </TableCell>
 
@@ -301,19 +316,25 @@ export default function BasicTableOne({
                       <Badge
                         size="sm"
                         color={
-                          sms.status === "delivered"
+                          sms.delivery_status === "delivered"
                             ? "success"
                             : sms.status === "pending"
                             ? "warning"
                             : "error"
                         }
                       >
-                        {sms.status}
+                        {sms.delivery_status || sms.status}
                       </Badge>
                     </TableCell>
 
                     <TableCell className="px-5 py-4 text-start text-gray-500 text-theme-xs dark:text-gray-400">
-                      {sms.date}
+                      {new Date(sms.created_at).toLocaleDateString('en-US', { 
+                        year: 'numeric', 
+                        month: 'short', 
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
                     </TableCell>
 
                     <TableCell className="px-5 py-4 text-start">
@@ -327,23 +348,16 @@ export default function BasicTableOne({
                           <Eye className="w-4 h-4" />
                         </button>
 
-                        {/* Resend */}
-                        <button
-                          onClick={() => showResendToast(sms.to)}
-                          className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-brand-600 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-brand-400 transition-colors"
-                          title="Resend"
-                        >
-                          <MessageSquare className="w-4 h-4" />
-                        </button>
-
-                        {/* Delete */}
-                        <button
-                          onClick={() => deleteRow(sms.id)}
-                          className="p-1.5 rounded-lg text-gray-500 hover:bg-red-50 hover:text-red-600 dark:text-gray-400 dark:hover:bg-red-500/10 dark:hover:text-red-400 transition-colors"
-                          title="Delete"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        {/* Delete - Admin only */}
+                        {isAdmin && (
+                          <button
+                            onClick={() => deleteRow(sms.id)}
+                            className="p-1.5 rounded-lg text-gray-500 hover:bg-red-50 hover:text-red-600 dark:text-gray-400 dark:hover:bg-red-500/10 dark:hover:text-red-400 transition-colors"
+                            title="Delete"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -354,7 +368,7 @@ export default function BasicTableOne({
         </div>
 
         {/* Pagination Footer */}
-        {totalPages > 1 && (
+        {filtered.length > 0 && (
           <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100 dark:border-white/5">
             <span className="text-xs text-gray-500 dark:text-gray-400">
               Showing {(currentPage - 1) * itemsPerPage + 1} to{" "}

@@ -1,20 +1,91 @@
 'use client';
 
-import Chart from "react-apexcharts";
+import { useQuery } from '@tanstack/react-query';
 import { ApexOptions } from "apexcharts";
 import { Package } from 'lucide-react';
 import { useState } from 'react';
+import Chart from "react-apexcharts";
+import { useAuth } from '../../context/AuthContext';
+
+interface SmsHistory {
+  id: string;
+  status: string;
+  delivery_status: string;
+  cost: number;
+  created_at: string;
+}
+
+interface SmsHistoryResponse {
+  data: SmsHistory[];
+  count: number;
+}
 
 export default function SalesCategoryChart() {
-  const total = 2450;
+  const { user, apiClient } = useAuth();
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
 
+  // Fetch user stats (balance, SMS cost, etc.)
+  const { data: userStats } = useQuery({
+    queryKey: ['userStats', user?.id],
+    queryFn: async () => {
+      const token = apiClient.getToken();
+      if (!token) return null;
+
+      const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${baseUrl}/api/v1/user-data/stats`, {
+        headers: {
+          'accept': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) throw new Error('Failed to fetch user stats');
+      return response.json();
+    },
+    enabled: !!user,
+    staleTime: 30_000,
+  });
+
+  // Fetch SMS history for statistics
+  const { data: smsHistory } = useQuery({
+    queryKey: ['smsHistoryStats', user?.id],
+    queryFn: async (): Promise<SmsHistoryResponse> => {
+      const token = apiClient.getToken();
+      if (!token) return { data: [], count: 0 };
+
+      const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${baseUrl}/api/v1/historysms/?skip=0&limit=100`, {
+        headers: {
+          'accept': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) throw new Error('Failed to fetch SMS history');
+      return response.json();
+    },
+    enabled: !!user,
+    staleTime: 30_000,
+  });
+
+  // Calculate statistics from SMS history
+  const deliveredCount = smsHistory?.data.filter(sms => sms.delivery_status === 'delivered').length || 0;
+  const pendingCount = smsHistory?.data.filter(sms => sms.status === 'pending' || sms.delivery_status === 'pending').length || 0;
+  const failedCount = smsHistory?.data.filter(sms => sms.status === 'failed' || sms.delivery_status === 'failed').length || 0;
+  const totalSms = deliveredCount + pendingCount + failedCount;
+
+  // Calculate percentages based on actual data
+  const deliveredPercent = totalSms > 0 ? Math.round((deliveredCount / totalSms) * 100) : 0;
+  const pendingPercent = totalSms > 0 ? Math.round((pendingCount / totalSms) * 100) : 0;
+  const failedPercent = totalSms > 0 ? Math.round((failedCount / totalSms) * 100) : 0;
+
   const categories = [
-    { name: 'Affiliate Program', percent: 48, products: 2040, color: '#465FFF' },
-    { name: 'Direct Buy', percent: 33, products: 1402, color: '#3B82F6' },
-    { name: 'Adsense', percent: 19, products: 510, color: '#93C5FD' },
+    { name: 'Transaction', percent: deliveredPercent, products: deliveredCount, color: '#465FFF' },
+    { name: 'Available', percent: pendingPercent, products: pendingCount, color: '#3B82F6' },
+    { name: 'Stats', percent: failedPercent, products: failedCount, color: '#93C5FD' },
   ];
 
+  const total = totalSms;
   const series = categories.map(cat => cat.percent);
 
   const displayValue = activeIndex !== null 
@@ -116,6 +187,10 @@ export default function SalesCategoryChart() {
     ],
   };
 
+  const balance = userStats?.wallet_balance ? parseFloat(userStats.wallet_balance) : 0;
+  const smsCost = userStats?.sms_cost ? parseFloat(userStats.sms_cost) : 0;
+  const estimatedSmsCount = userStats?.estimated_sms_count || 0;
+
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-2 dark:border-gray-800 dark:bg-white/[0.03] sm:p-6">
       {/* Header */}
@@ -131,6 +206,28 @@ export default function SalesCategoryChart() {
         <button className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-white/10 dark:hover:text-gray-300 transition-colors">
           <Package className="h-5 w-5" />
         </button>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="rounded-lg bg-gray-50 dark:bg-gray-900/50 p-3">
+          <p className="text-xs font-medium text-gray-600 dark:text-gray-400">Balance</p>
+          <p className="mt-1 text-sm font-bold text-gray-900 dark:text-white">
+            UGx{balance.toFixed(2)}
+          </p>
+        </div>
+        <div className="rounded-lg bg-gray-50 dark:bg-gray-900/50 p-3">
+          <p className="text-xs font-medium text-gray-600 dark:text-gray-400">SMS Cost</p>
+          <p className="mt-1 text-sm font-bold text-gray-900 dark:text-white">
+            UGx{smsCost.toFixed(4)}
+          </p>
+        </div>
+        <div className="rounded-lg bg-gray-50 dark:bg-gray-900/50 p-3">
+          <p className="text-xs font-medium text-gray-600 dark:text-gray-400">Available SMS</p>
+          <p className="mt-1 text-xl font-bold text-gray-900 dark:text-white">
+            {estimatedSmsCount.toLocaleString()}
+          </p>
+        </div>
       </div>
 
       <div className="flex flex-col gap-6 lg:flex-row lg:items-center">

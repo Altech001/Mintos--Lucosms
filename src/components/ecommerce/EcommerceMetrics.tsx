@@ -1,11 +1,80 @@
 import { BoltIcon, BoxesIcon, PackageOpen } from "lucide-react";
-import {
-  ArrowDownIcon,
-  ArrowUpIcon
-} from "../../icons";
 import Badge from "../ui/badge/Badge";
+import { useQuery } from '@tanstack/react-query';
+import { useAuth } from '../../context/AuthContext';
+
+interface SmsHistoryItem {
+  id: string;
+  recipient: string;
+  message: string;
+  status: string;
+  delivery_status: string;
+  created_at: string;
+}
+
+interface UserProfile {
+  plan: string;
+  wallet_balance: string;
+  sms_cost: string;
+}
 
 export default function EcommerceMetrics() {
+  const { apiClient } = useAuth();
+
+  // Fetch SMS history for accurate statistics
+  const { data: smsHistory = [] } = useQuery<SmsHistoryItem[]>({
+    queryKey: ['smsHistoryMetrics'],
+    queryFn: async () => {
+      const token = apiClient.getToken();
+      if (!token) throw new Error('No auth token');
+
+      const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${baseUrl}/api/v1/historysms/?skip=0&limit=1000`, {
+        headers: {
+          'accept': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) throw new Error('Failed to fetch SMS history');
+      const result = await response.json();
+      return result.data || [];
+    },
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+  });
+
+  // Fetch user profile for plan info
+  const { data: userProfile } = useQuery<UserProfile>({
+    queryKey: ['userProfile'],
+    queryFn: async () => {
+      const token = apiClient.getToken();
+      if (!token) throw new Error('No auth token');
+
+      const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${baseUrl}/api/v1/user-data/profile`, {
+        headers: {
+          'accept': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) throw new Error('Failed to fetch profile');
+      return response.json();
+    },
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+  });
+
+  // Calculate statistics from SMS history
+  const totalSuccess = smsHistory.filter(
+    (sms) => sms.delivery_status === 'delivered' || sms.status === 'success' || sms.status === 'sent'
+  ).length;
+  const totalEnqueued = smsHistory.filter(
+    (sms) => sms.status === 'pending' || sms.delivery_status === 'pending'
+  ).length;
+  const currentPlan = userProfile?.plan || 'Free';
+  const availablePlans = ['Free', 'Basic', 'Pro', 'Enterprise'];
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 md:gap-6">
       {/* <!-- Metric Item Start --> */}
@@ -20,12 +89,11 @@ export default function EcommerceMetrics() {
               SMS Success
             </span>
             <h5 className="mt-2 font-bold text-gray-800 text-title-xs dark:text-white/90">
-              3,782
+              {totalSuccess.toLocaleString()}
             </h5>
           </div>
-          <Badge color="success">
-            <ArrowUpIcon />
-            11.01%
+          <Badge color="success" size="sm">
+            Success
           </Badge>
         </div>
       </div>
@@ -40,16 +108,15 @@ export default function EcommerceMetrics() {
         <div className="flex items-end justify-between mt-5">
           <div>
             <span className="text-sm text-gray-500 dark:text-gray-400">
-              Delivered
+              Enqueued
             </span>
             <h5 className="mt-2 font-bold text-gray-800 text-title-xs dark:text-white/90">
-              50,359
+              {totalEnqueued.toLocaleString()}
             </h5>
           </div>
 
-          <Badge color="warning">
-            <ArrowDownIcon />
-            9.05%
+          <Badge color="warning" size="sm">
+            Enqueued
           </Badge>
         </div>
       </div>
@@ -62,17 +129,27 @@ export default function EcommerceMetrics() {
         <div className="flex items-end justify-between mt-5">
           <div>
             <span className="text-sm text-gray-500 dark:text-gray-400">
-              Extension
+              Current Plan
             </span>
             <h4 className="mt-2 font-bold text-gray-800 text-title-xs dark:text-white/90">
-              4 
+              {currentPlan}
             </h4>
           </div>
 
-          <Badge color="success">
-            <ArrowDownIcon />
-            9.05%
-          </Badge>
+          <div className="flex flex-col gap-1">
+            <span className="text-xs text-gray-500 dark:text-gray-400">Available Plans:</span>
+            <div className="flex flex-wrap gap-1">
+              {availablePlans.map((plan) => (
+                <Badge 
+                  key={plan} 
+                  color={plan === currentPlan ? 'success' : 'warning'}
+                  size="sm"
+                >
+                  {plan}
+                </Badge>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
 

@@ -8,52 +8,76 @@ import {
 import Badge from "../ui/badge/Badge";
 import Checkbox from "../form/input/Checkbox";
 import { useState } from "react";
+import { useQuery } from '@tanstack/react-query';
+import { useAuth } from '../../context/AuthContext';
 
-interface SMSRecord {
-  id: number;
-  date: string;
-  text: string;
-  from: string;
-  to: string;
+interface SmsHistory {
+  id: string;
+  recipient: string;
+  message: string;
+  status: string;
+  sms_count: number;
   cost: number;
-  status: "Delivered" | "Pending" | "Failed";
+  template_id: string | null;
+  error_message: string | null;
+  delivery_status: string;
+  external_id: string | null;
+  created_at: string;
+  updated_at: string;
+  sent_at: string | null;
+  delivered_at: string | null;
+  user_id: string;
 }
 
-const tableData: SMSRecord[] = [
-  {
-    id: 1,
-    date: "2024-01-15 10:30",
-    text: "Your order #12345 has been shipped and will arrive within 2-3 business days",
-    from: "ATUpdates",
-    to: "+256700987654",
-    cost: 32,
-    status: "Delivered",
-  },
-  {
-    id: 2,
-    date: "2024-01-15 09:15",
-    text: "Appointment reminder for tomorrow at 3:00 PM",
-    from: "ATTech",
-    to: "+256700987655",
-    cost: 32,
-    status: "Pending",
-  }
-];
+interface SmsHistoryResponse {
+  data: SmsHistory[];
+  count: number;
+}
 
 export default function RecentOrders() {
+  const { user, apiClient } = useAuth();
   const [selectAll, setSelectAll] = useState(false);
-  const [selectedItems, setSelectedItems] = useState<number[]>([]);
+  const [selectedItems, setSelectedItems] = useState<string[]>([]);
+
+  // Fetch recent SMS history (last 2)
+  const fetchRecentSms = async (): Promise<SmsHistory[]> => {
+    const token = apiClient.getToken();
+    if (!token) return [];
+
+    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+    const endpoint = `${baseUrl}/api/v1/historysms/?skip=0&limit=5`;
+
+    const response = await fetch(endpoint, {
+      headers: {
+        'accept': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch SMS history');
+    }
+
+    const result: SmsHistoryResponse = await response.json();
+    return result.data;
+  };
+
+  const { data: recentSms = [], isLoading } = useQuery({
+    queryKey: ['recentSms', user?.id],
+    queryFn: fetchRecentSms,
+    staleTime: 30_000,
+  });
 
   const handleSelectAll = (checked: boolean) => {
     setSelectAll(checked);
     if (checked) {
-      setSelectedItems(tableData.map(item => item.id));
+      setSelectedItems(recentSms.map(item => item.id));
     } else {
       setSelectedItems([]);
     }
   };
 
-  const handleSelectItem = (id: number, checked: boolean) => {
+  const handleSelectItem = (id: string, checked: boolean) => {
     if (checked) {
       setSelectedItems(prev => [...prev, id]);
     } else {
@@ -87,7 +111,7 @@ export default function RecentOrders() {
             <TableRow>
               <TableCell
                 isHeader
-                className="py-3 px-4 font-medium text-white text-start text-theme-xs whitespace-nowrap"
+                className="py-3 px-4 font-medium text-gray-700 dark:text-white text-start text-theme-xs whitespace-nowrap"
               >
                 <Checkbox 
                   checked={selectAll} 
@@ -96,37 +120,37 @@ export default function RecentOrders() {
               </TableCell>
               <TableCell
                 isHeader
-                className="py-3 px-4 font-medium text-white text-start text-theme-xs whitespace-nowrap"
+                className="py-3 px-4 font-medium text-gray-700 dark:text-white text-start text-theme-xs whitespace-nowrap"
               >
                 Date
               </TableCell>
               <TableCell
                 isHeader
-                className="py-3 px-4 font-medium text-white text-start text-theme-xs whitespace-nowrap min-w-[300px]"
+                className="py-3 px-4 font-medium text-gray-700 dark:text-white text-start text-theme-xs whitespace-nowrap min-w-[300px]"
               >
                 Text
               </TableCell>
               <TableCell
                 isHeader
-                className="py-3 px-4 font-medium text-white text-start text-theme-xs whitespace-nowrap"
+                className="py-3 px-4 font-medium text-gray-700 dark:text-white text-start text-theme-xs whitespace-nowrap"
               >
                 Status
               </TableCell>
               <TableCell
                 isHeader
-                className="py-3 px-4 font-medium text-white text-start text-theme-xs whitespace-nowrap"
+                className="py-3 px-4 font-medium text-gray-700 dark:text-white text-start text-theme-xs whitespace-nowrap"
               >
                 To
               </TableCell>
               <TableCell
                 isHeader
-                className="py-3 px-4 font-medium text-white text-start text-theme-xs whitespace-nowrap"
+                className="py-3 px-4 font-medium text-gray-700 dark:text-white text-start text-theme-xs whitespace-nowrap"
               >
                 Cost
               </TableCell>
               <TableCell
                 isHeader
-                className="py-3 px-4 font-medium text-white text-start text-theme-xs whitespace-nowrap"
+                className="py-3 px-4 font-medium text-gray-700 dark:text-white text-start text-theme-xs whitespace-nowrap"
               >
                 From
               </TableCell>
@@ -134,47 +158,67 @@ export default function RecentOrders() {
           </TableHeader>
 
           <TableBody className="divide-y divide-gray-100 dark:divide-gray-800">
-            {tableData.map((sms) => (
-              <TableRow key={sms.id}>
-                <TableCell className="py-3 px-4">
-                  <Checkbox 
-                    checked={selectedItems.includes(sms.id)} 
-                    onChange={(checked) => handleSelectItem(sms.id, checked)}
-                  />
-                </TableCell>
-                <TableCell className="py-3 px-4 text-gray-700 text-theme-sm dark:text-gray-300 whitespace-nowrap">
-                  {sms.date}
-                </TableCell>
-                <TableCell className="py-3 px-4 text-gray-700 text-theme-sm dark:text-gray-300 min-w-[300px]">
-                  <div className="line-clamp-1.8">
-                    {sms.text}
-                  </div>
-                </TableCell>
-                <TableCell className="py-3 px-4">
-                  <Badge
-                    size="sm"
-                    color={
-                      sms.status === "Delivered"
-                        ? "success"
-                        : sms.status === "Pending"
-                        ? "warning"
-                        : "error"
-                    }
-                  >
-                    {sms.status}
-                  </Badge>
-                </TableCell>
-                <TableCell className="py-3 px-4 text-gray-700 text-theme-sm dark:text-gray-300 whitespace-nowrap">
-                  {sms.to}
-                </TableCell>
-                <TableCell className="py-3 px-4 text-gray-700 text-theme-sm dark:text-gray-300 whitespace-nowrap">
-                  {sms.cost}
-                </TableCell>
-                <TableCell className="py-3 px-4 text-gray-700 text-theme-sm dark:text-gray-300 whitespace-nowrap">
-                  {sms.from}
+            {isLoading ? (
+              <TableRow>
+                <TableCell colSpan={7} className="py-8 text-center text-gray-500 dark:text-gray-400">
+                  Loading recent SMS...
                 </TableCell>
               </TableRow>
-            ))}
+            ) : recentSms.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} className="py-8 text-center text-gray-500 dark:text-gray-400">
+                  No recent SMS found
+                </TableCell>
+              </TableRow>
+            ) : (
+              recentSms.map((sms) => (
+                <TableRow key={sms.id}>
+                  <TableCell className="py-3 px-4">
+                    <Checkbox 
+                      checked={selectedItems.includes(sms.id)} 
+                      onChange={(checked) => handleSelectItem(sms.id, checked)}
+                    />
+                  </TableCell>
+                  <TableCell className="py-3 px-4 text-gray-700 text-theme-sm dark:text-gray-300 whitespace-nowrap">
+                    {new Date(sms.created_at).toLocaleDateString('en-US', { 
+                      year: 'numeric', 
+                      month: 'short', 
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </TableCell>
+                  <TableCell className="py-3 px-4 text-gray-700 text-theme-sm dark:text-gray-300 min-w-[300px]">
+                    <div className="line-clamp-1.8">
+                      {sms.message}
+                    </div>
+                  </TableCell>
+                  <TableCell className="py-3 px-4">
+                    <Badge
+                      size="sm"
+                      color={
+                        sms.delivery_status === "delivered"
+                          ? "success"
+                          : sms.status === "pending"
+                          ? "warning"
+                          : "error"
+                      }
+                    >
+                      {sms.delivery_status || sms.status}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="py-3 px-4 text-gray-700 text-theme-sm dark:text-gray-300 whitespace-nowrap">
+                    {sms.recipient}
+                  </TableCell>
+                  <TableCell className="py-3 px-4 text-gray-700 text-theme-sm dark:text-gray-300 whitespace-nowrap">
+                    {sms.cost}
+                  </TableCell>
+                  <TableCell className="py-3 px-4 text-gray-700 text-theme-sm dark:text-gray-300 whitespace-nowrap">
+                    -
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </div>
