@@ -1,58 +1,76 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Dropdown } from "../ui/dropdown/Dropdown";
 import { DropdownItem } from "../ui/dropdown/DropdownItem";
 import { Link } from "react-router";
 import { MessageSquare } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "../../context/AuthContext";
 
-interface SMSNotification {
-  id: number;
+interface SmsHistory {
+  id: string;
+  recipient: string;
   message: string;
-  time: string;
-  type: "sent" | "failed" | "delivered";
+  status: string;
+  sms_count: number;
+  cost: number;
+  template_id: string | null;
+  error_message: string | null;
+  delivery_status: string;
+  external_id: string | null;
+  created_at: string;
+  updated_at: string;
+  sent_at: string | null;
+  delivered_at: string | null;
+  user_id: string;
 }
 
-const notifications: SMSNotification[] = [
-  {
-    id: 1,
-    message: "SMS delivered to +256700987654",
-    time: "2 min ago",
-    type: "delivered",
-  },
-  {
-    id: 2,
-    message: "Failed to send SMS to +256700987655",
-    time: "5 min ago",
-    type: "failed",
-  },
-  {
-    id: 3,
-    message: "Bulk SMS campaign completed - 1,250 messages sent",
-    time: "15 min ago",
-    type: "sent",
-  },
-  {
-    id: 4,
-    message: "SMS delivered to +256700987656",
-    time: "30 min ago",
-    type: "delivered",
-  },
-  {
-    id: 5,
-    message: "Low balance alert - 500 credits remaining",
-    time: "1 hr ago",
-    type: "failed",
-  },
-  {
-    id: 6,
-    message: "SMS delivered to +256700987657",
-    time: "2 hrs ago",
-    type: "delivered",
-  },
-];
+interface SmsHistoryResponse {
+  data: SmsHistory[];
+  count: number;
+}
 
 export default function NotificationDropdown() {
+  const { user, apiClient } = useAuth();
+  const isAdmin = !!user?.isSuperuser;
   const [isOpen, setIsOpen] = useState(false);
-  const [notifying, setNotifying] = useState(true);
+
+  // Fetch recent SMS history
+  const fetchRecentSms = async (): Promise<SmsHistory[]> => {
+    const token = apiClient.getToken();
+    if (!token) return [];
+
+    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+    const endpoint = isAdmin 
+      ? `${baseUrl}/api/v1/historysms/all?skip=0&limit=6`
+      : `${baseUrl}/api/v1/historysms/?skip=0&limit=6`;
+
+    const response = await fetch(endpoint, {
+      headers: {
+        'accept': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      return [];
+    }
+
+    const result: SmsHistoryResponse = await response.json();
+    return result.data;
+  };
+
+  const { data: notifications = [] } = useQuery({
+    queryKey: ['recentNotifications', user?.id, isAdmin],
+    queryFn: fetchRecentSms,
+    staleTime: 30_000,
+    refetchInterval: 60_000, // Refetch every minute
+  });
+
+  // Check if there are any new notifications (created in last 5 minutes)
+  const hasNewNotifications = useMemo(() => {
+    const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
+    return notifications.some(n => new Date(n.created_at).getTime() > fiveMinutesAgo);
+  }, [notifications]);
 
   function toggleDropdown() {
     setIsOpen(!isOpen);
@@ -64,19 +82,35 @@ export default function NotificationDropdown() {
 
   const handleClick = () => {
     toggleDropdown();
-    setNotifying(false);
   };
 
-  const getStatusColor = (type: string) => {
-    switch (type) {
-      case "delivered":
-        return "bg-green-500";
-      case "failed":
-        return "bg-red-500";
-      case "sent":
-        return "bg-blue-500";
-      default:
-        return "bg-gray-500";
+  const getStatusColor = (deliveryStatus: string, status: string) => {
+    if (deliveryStatus === "delivered") return "bg-green-500";
+    if (deliveryStatus === "failed" || status === "failed") return "bg-red-500";
+    if (status === "sent" || status === "queued") return "bg-blue-500";
+    return "bg-gray-500";
+  };
+
+  const formatTimeAgo = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins} min ago`;
+    if (diffHours < 24) return `${diffHours} hr${diffHours > 1 ? 's' : ''} ago`;
+    return date.toLocaleDateString();
+  };
+
+  const getNotificationMessage = (notification: SmsHistory) => {
+    if (notification.delivery_status === 'delivered') {
+      return `SMS delivered to ${notification.recipient}`;
+    } else if (notification.delivery_status === 'failed' || notification.status === 'failed') {
+      return `Failed to send SMS to ${notification.recipient}`;
+    } else {
+      return `SMS sent to ${notification.recipient}`;
     }
   };
 
@@ -86,13 +120,11 @@ export default function NotificationDropdown() {
         className="relative flex items-center justify-center text-gray-500 transition-colors bg-white border border-gray-200 rounded-full dropdown-toggle hover:text-gray-700 h-11 w-11 hover:bg-gray-100 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white"
         onClick={handleClick}
       >
-        <span
-          className={`absolute right-0 top-0.5 z-10 h-2 w-2 rounded-full bg-orange-400 ${
-            !notifying ? "hidden" : "flex"
-          }`}
-        >
-          <span className="absolute inline-flex w-full h-full bg-orange-400 rounded-full opacity-75 animate-ping"></span>
-        </span>
+        {hasNewNotifications && (
+          <span className="absolute right-0 top-0.5 z-10 h-2 w-2 rounded-full bg-orange-400 flex">
+            <span className="absolute inline-flex w-full h-full bg-orange-400 rounded-full opacity-75 animate-ping"></span>
+          </span>
+        )}
         <svg
           className="fill-current"
           width="20"
@@ -136,36 +168,42 @@ export default function NotificationDropdown() {
           </button>
         </div>
         <ul className="flex flex-col h-auto overflow-y-auto custom-scrollbar">
-          {notifications.map((notification) => (
-            <li key={notification.id}>
-              <DropdownItem
-                onItemClick={closeDropdown}
-                className="flex gap-3 rounded-lg border-b border-gray-100 p-3 hover:bg-gray-100 dark:border-gray-800 dark:hover:bg-white/5"
-              >
-                <div className="flex items-start justify-center flex-shrink-0 w-10 h-10">
-                  <div className="flex items-center justify-center w-10 h-10 bg-gray-100 rounded-full dark:bg-gray-800">
-                    <MessageSquare className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-                  </div>
-                </div>
-
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-gray-800 dark:text-white/90">
-                    {notification.message}
-                  </p>
-
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className={`w-2 h-2 rounded-full ${getStatusColor(notification.type)}`}></span>
-                    <span className="text-xs text-gray-500 dark:text-gray-400">
-                      {notification.time}
-                    </span>
-                  </div>
-                </div>
-              </DropdownItem>
+          {notifications.length === 0 ? (
+            <li className="text-center py-8 text-sm text-gray-500 dark:text-gray-400">
+              No recent notifications
             </li>
-          ))}
+          ) : (
+            notifications.map((notification) => (
+              <li key={notification.id}>
+                <DropdownItem
+                  onItemClick={closeDropdown}
+                  className="flex gap-3 rounded-lg border-b border-gray-100 p-3 hover:bg-gray-100 dark:border-gray-800 dark:hover:bg-white/5"
+                >
+                  <div className="flex items-start justify-center flex-shrink-0 w-10 h-10">
+                    <div className="flex items-center justify-center w-10 h-10 bg-gray-100 rounded-full dark:bg-gray-800">
+                      <MessageSquare className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                    </div>
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-gray-800 dark:text-white/90">
+                      {getNotificationMessage(notification)}
+                    </p>
+
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className={`w-2 h-2 rounded-full ${getStatusColor(notification.delivery_status, notification.status)}`}></span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                        {formatTimeAgo(notification.created_at)}
+                      </span>
+                    </div>
+                  </div>
+                </DropdownItem>
+              </li>
+            ))
+          )}
         </ul>
         <Link
-          to="/"
+          to="/notifications"
           className="block px-4 py-2 mt-3 text-sm font-medium text-center text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
         >
           View All Notifications

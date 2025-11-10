@@ -7,6 +7,7 @@ import NotificationDropdown from "../components/header/NotificationDropdown";
 import WalletButton from "../components/wallet/walletbtn";
 import { useSidebar } from "../context/SidebarContext";
 import PlanButton from "../components/header/PlanButton";
+import LowBalanceAlert from "../components/header/LowBalanceAlert";
 
 const AppHeader: React.FC = () => {
   const [isApplicationMenuOpen, setApplicationMenuOpen] = useState(false);
@@ -124,6 +125,7 @@ const AppHeader: React.FC = () => {
 
           {/* Wallet and also plan */}
           <WalletButton />
+        <LowBalanceAlert />
         </div>
         <div
           className={`${

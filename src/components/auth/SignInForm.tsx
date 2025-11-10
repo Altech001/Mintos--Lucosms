@@ -13,18 +13,42 @@ export default function SignInForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setIsLoading(true);
     try {
       await login(email, password);
       navigate("/");
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "An unexpected error occurred.";
+      let message = "An unexpected error occurred.";
+      
+      if (err instanceof Error) {
+        // Check for common error patterns
+        const errorMsg = err.message.toLowerCase();
+        
+        if (errorMsg.includes("401") || errorMsg.includes("unauthorized") || errorMsg.includes("incorrect")) {
+          message = "Invalid email or password. Please check your credentials and try again.";
+        } else if (errorMsg.includes("404") || errorMsg.includes("not found")) {
+          message = "Account not found. Please check your email or sign up.";
+        } else if (errorMsg.includes("network") || errorMsg.includes("fetch")) {
+          message = "Network error. Please check your internet connection and try again.";
+        } else if (errorMsg.includes("timeout")) {
+          message = "Request timed out. Please try again.";
+        } else if (errorMsg.includes("500") || errorMsg.includes("server")) {
+          message = "Server error. Please try again later.";
+        } else {
+          message = err.message;
+        }
+      }
+      
       setError(message);
+    } finally {
+      setIsLoading(false);
     }
   };
   return (
@@ -142,7 +166,7 @@ export default function SignInForm() {
                   </Link>
                 </div>
                 <div>
-                  <Button type="submit" className="w-full" size="sm">
+                  <Button type="submit" className="w-full" size="sm" isLoading={isLoading}>
                     Log in
                   </Button>
                   {error && <p className="mt-2 text-sm text-center text-error-500">{error}</p>}

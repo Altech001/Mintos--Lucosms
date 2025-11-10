@@ -14,6 +14,7 @@ export default function SignUpForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
   const { register } = useAuth();
   const navigate = useNavigate();
 
@@ -24,12 +25,39 @@ export default function SignUpForm() {
       return;
     }
     setError(null);
+    setIsLoading(true);
     try {
       await register(email, password, fullName);
       navigate("/");
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "An unexpected error occurred.";
+      let message = "An unexpected error occurred.";
+      
+      if (err instanceof Error) {
+        // Check for common error patterns
+        const errorMsg = err.message.toLowerCase();
+        
+        if (errorMsg.includes("409") || errorMsg.includes("already exists") || errorMsg.includes("duplicate")) {
+          message = "An account with this email already exists. Please sign in instead.";
+        } else if (errorMsg.includes("400") || errorMsg.includes("invalid")) {
+          message = "Invalid input. Please check your details and try again.";
+        } else if (errorMsg.includes("password")) {
+          message = "Password does not meet requirements. Please use a stronger password.";
+        } else if (errorMsg.includes("email")) {
+          message = "Invalid email format. Please enter a valid email address.";
+        } else if (errorMsg.includes("network") || errorMsg.includes("fetch")) {
+          message = "Network error. Please check your internet connection and try again.";
+        } else if (errorMsg.includes("timeout")) {
+          message = "Request timed out. Please try again.";
+        } else if (errorMsg.includes("500") || errorMsg.includes("server")) {
+          message = "Server error. Please try again later.";
+        } else {
+          message = err.message;
+        }
+      }
+      
       setError(message);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -159,7 +187,7 @@ export default function SignUpForm() {
                   </p>
                 </div>
                 <div>
-                  <Button type="submit" className="w-full" size="sm">
+                  <Button type="submit" className="w-full" size="sm" isLoading={isLoading}>
                     Create Account
                   </Button>
                   {error && <p className="mt-2 text-sm text-center text-error-500">{error}</p>}

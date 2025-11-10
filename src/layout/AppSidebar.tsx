@@ -316,24 +316,27 @@ const AppSidebar: React.FC = () => {
                 className="dark:hidden"
                 src="/images/logo/luco.png"
                 alt="Logo"
-                width={40}
-                height={40}
+                width={30}
+                height={30}
+                style={{objectFit: "contain"}}
               />
               <img
                 className="hidden dark:block"
                 src="/images/logo/luco.png"
                 alt="Logo"
-                width={40}
-                height={40}
-              />
+                width={30}
+                height={30}
+                style={{objectFit: "contain"}}
+                />
             </>
           ) : (
             <img
               src="/images/logo/luco.png"
               alt="Logo"
-              width={32}
-              height={32}
-            />
+              width={30}
+              height={30}
+              style={{objectFit: "contain"}}
+              />
           )}
         </Link>
       </div>

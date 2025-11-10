@@ -14,78 +14,123 @@ interface SmsStats {
   pending: number;
 }
 
+interface SmsHistoryItem {
+  id: string;
+  to: string;
+  message: string;
+  status: string;
+  created_at: string;
+  delivered_at?: string;
+  from?: string;
+}
+
 export default function StatisticsChart() {
   const { apiClient } = useAuth();
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('daily');
 
-  // Fetch SMS statistics with caching
-  const fetchStats = async () => {
+  // Fetch SMS history with caching
+  const fetchSmsHistory = async () => {
     const token = apiClient.getToken();
     if (!token) throw new Error('No auth token');
 
     const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-    const response = await fetch(`${baseUrl}/api/v1/historysms/stats/summary`, {
+    // Fetch recent SMS history (adjust limit based on needs)
+    const response = await fetch(`${baseUrl}/api/v1/historysms/?skip=0&limit=1000`, {
       headers: {
         'accept': 'application/json',
         'Authorization': `Bearer ${token}`,
       },
     });
 
-    if (!response.ok) throw new Error('Failed to fetch stats');
-    return response.json();
+    if (!response.ok) throw new Error('Failed to fetch SMS history');
+    const data = await response.json();
+    return data.data || [];
   };
 
-  const { data: summaryData, isLoading } = useQuery({
-    queryKey: ['smsStats'],
-    queryFn: fetchStats,
+  const { data: smsHistory = [], isLoading } = useQuery({
+    queryKey: ['smsHistory'],
+    queryFn: fetchSmsHistory,
     staleTime: 30_000, // Cache for 30 seconds
     gcTime: 60_000, // Keep in cache for 1 minute
     refetchOnWindowFocus: false,
   });
 
-  // Generate stats data based on time period
-  const generateStatsData = (period: TimePeriod, summary: { total?: number; status?: { sent?: number; failed?: number; pending?: number } }): SmsStats[] => {
+  // Aggregate SMS history data based on time period
+  const aggregateSmsHistory = (period: TimePeriod, history: SmsHistoryItem[]): SmsStats[] => {
     const now = new Date();
     const stats: SmsStats[] = [];
+    
+    // Helper to get date key for grouping
+    const getDateKey = (dateStr: string, period: TimePeriod): string => {
+      const date = new Date(dateStr);
+      if (period === 'daily') {
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      } else if (period === 'weekly') {
+        const weekNum = Math.floor((now.getTime() - date.getTime()) / (7 * 24 * 60 * 60 * 1000));
+        return `Week ${weekNum}`;
+      } else {
+        return date.toLocaleDateString('en-US', { month: 'short' });
+      }
+    };
 
+    // Group SMS by date
+    const grouped: Record<string, { sent: number; delivered: number; failed: number; pending: number }> = {};
+    
+    history.forEach((sms) => {
+      const dateKey = getDateKey(sms.created_at, period);
+      if (!grouped[dateKey]) {
+        grouped[dateKey] = { sent: 0, delivered: 0, failed: 0, pending: 0 };
+      }
+      
+      grouped[dateKey].sent++;
+      
+      const status = sms.status?.toLowerCase() || '';
+      if (status.includes('delivered') || status === 'success') {
+        grouped[dateKey].delivered++;
+      } else if (status.includes('failed') || status === 'failed') {
+        grouped[dateKey].failed++;
+      } else if (status.includes('pending') || status === 'queued') {
+        grouped[dateKey].pending++;
+      }
+    });
+
+    // Generate time periods and fill with data
     if (period === 'daily') {
-      // Last 7 days
       for (let i = 6; i >= 0; i--) {
         const date = new Date(now);
         date.setDate(date.getDate() - i);
+        const dateKey = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
         stats.push({
-          date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-          sent: Math.floor(Math.random() * (summary.total || 10)),
-          delivered: Math.floor(Math.random() * (summary.status?.sent || 5)),
-          failed: Math.floor(Math.random() * (summary.status?.failed || 2)),
-          pending: Math.floor(Math.random() * (summary.status?.pending || 3)),
+          date: dateKey,
+          sent: grouped[dateKey]?.sent || 0,
+          delivered: grouped[dateKey]?.delivered || 0,
+          failed: grouped[dateKey]?.failed || 0,
+          pending: grouped[dateKey]?.pending || 0,
         });
       }
     } else if (period === 'weekly') {
-      // Last 8 weeks
       for (let i = 7; i >= 0; i--) {
-        const date = new Date(now);
-        date.setDate(date.getDate() - (i * 7));
+        const dateKey = `Week ${i}`;
         stats.push({
-          date: `Week ${8 - i}`,
-          sent: Math.floor(Math.random() * (summary.total || 50)),
-          delivered: Math.floor(Math.random() * (summary.status?.sent || 30)),
-          failed: Math.floor(Math.random() * (summary.status?.failed || 10)),
-          pending: Math.floor(Math.random() * (summary.status?.pending || 15)),
+          date: dateKey,
+          sent: grouped[dateKey]?.sent || 0,
+          delivered: grouped[dateKey]?.delivered || 0,
+          failed: grouped[dateKey]?.failed || 0,
+          pending: grouped[dateKey]?.pending || 0,
         });
       }
     } else {
-      // Last 12 months
       const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
       const currentMonth = now.getMonth();
       for (let i = 11; i >= 0; i--) {
         const monthIndex = (currentMonth - i + 12) % 12;
+        const monthKey = months[monthIndex];
         stats.push({
-          date: months[monthIndex],
-          sent: Math.floor(Math.random() * (summary.total || 100)),
-          delivered: Math.floor(Math.random() * (summary.status?.sent || 70)),
-          failed: Math.floor(Math.random() * (summary.status?.failed || 15)),
-          pending: Math.floor(Math.random() * (summary.status?.pending || 20)),
+          date: monthKey,
+          sent: grouped[monthKey]?.sent || 0,
+          delivered: grouped[monthKey]?.delivered || 0,
+          failed: grouped[monthKey]?.failed || 0,
+          pending: grouped[monthKey]?.pending || 0,
         });
       }
     }
@@ -93,11 +138,11 @@ export default function StatisticsChart() {
     return stats;
   };
 
-  // Generate stats data based on time period
+  // Generate stats data based on time period and actual SMS history
   const statsData = useMemo(() => {
-    if (!summaryData) return [];
-    return generateStatsData(timePeriod, summaryData);
-  }, [timePeriod, summaryData]);
+    if (!smsHistory || smsHistory.length === 0) return [];
+    return aggregateSmsHistory(timePeriod, smsHistory);
+  }, [timePeriod, smsHistory]);
 
   const categories = useMemo(() => statsData.map(s => s.date), [statsData]);
   const sentData = useMemo(() => statsData.map(s => s.sent), [statsData]);

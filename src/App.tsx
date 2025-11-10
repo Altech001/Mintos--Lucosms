@@ -24,6 +24,8 @@ import UserManagementPage from "./pages/Admin/UserManagement";
 import PromoCodeManagementPage from "./pages/Admin/PromoCodeManagement";
 import ApiKeysPage from "./pages/Developer/ApiKeysPage";
 import SettingsPage from "./pages/Settings/SettingsPage";
+import ActivityLogs from "./pages/Logs/ActivityLogs";
+import Notifications from "./pages/Notifications/Notifications";
 
 export default function App() {
   return (
@@ -48,6 +50,8 @@ export default function App() {
               <Route path="/history" element={<RecentHistory />} />
               <Route path="/whatsappmsg" element={<WapMessage />} />
               <Route path="/profile" element={<ProfilePage />} />
+              <Route path="/logs" element={<ActivityLogs />} />
+              <Route path="/notifications" element={<Notifications />} />
               <Route path="/developer/api-keys" element={<ApiKeysPage />} />
             </Route>
           </Route>

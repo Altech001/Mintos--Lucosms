@@ -197,14 +197,14 @@ export default function RecentOrders() {
                     <Badge
                       size="sm"
                       color={
-                        sms.delivery_status === "delivered"
+                        sms.status === "delivered"
                           ? "success"
                           : sms.status === "pending"
                           ? "warning"
                           : "error"
                       }
                     >
-                      {sms.delivery_status || sms.status}
+                      {sms.status}
                     </Badge>
                   </TableCell>
                   <TableCell className="py-3 px-4 text-gray-700 text-theme-sm dark:text-gray-300 whitespace-nowrap">

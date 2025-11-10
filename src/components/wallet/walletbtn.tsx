@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Button from "../../components/ui/button/Button";
 import { Wallet, RefreshCw } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+
+const AUTO_REFRESH_INTERVAL = 20000; // 20 seconds
 
 export default function WalletButton() {
   const { user, checkAuth, isLoading } = useAuth();
@@ -15,6 +17,16 @@ export default function WalletButton() {
       setIsRefreshing(false);
     }
   };
+
+  // Auto-refresh wallet balance every 30 seconds
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      checkAuth();
+    }, AUTO_REFRESH_INTERVAL);
+
+    // Cleanup interval on component unmount
+    return () => clearInterval(intervalId);
+  }, [checkAuth]);
 
   const walletBalance = user?.wallet ? parseFloat(user.wallet).toFixed(2) : '0.00';
 

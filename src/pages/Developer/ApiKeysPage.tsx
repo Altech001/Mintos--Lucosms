@@ -6,6 +6,7 @@ import Modal from "../../components/ui/modal/Modal";
 import Input from "../../components/form/input/InputField";
 import Label from "../../components/form/Label";
 import Skeleton from "../../components/ui/Skeleton";
+import { Copy, Check } from "lucide-react";
 
 export default function ApiKeysPage() {
   const { apiClient } = useAuth();
@@ -13,9 +14,11 @@ export default function ApiKeysPage() {
   const [error, setError] = useState<string | null>(null);
   const [isCreateModalOpen, setCreateModalOpen] = useState(false);
   const [newKeyName, setNewKeyName] = useState("");
-  const [newlyCreatedKey, setNewlyCreatedKey] = useState<ApiKeyPublic & { plain_key?: string } | null>(null);
+  const [newlyCreatedKey, setNewlyCreatedKey] = useState<ApiKeyPublic & { plain_key?: string; key?: string; plainKey?: string } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isMutating, setIsMutating] = useState<string | boolean>(false); // boolean for create, string for other actions by key ID
+  const [copied, setCopied] = useState(false);
+  const [isRegenerate, setIsRegenerate] = useState(false);
 
   const fetchApiKeys = useCallback(async () => {
     setIsLoading(true);
@@ -43,8 +46,10 @@ export default function ApiKeysPage() {
     try {
       const response = await apiClient.api.apiKeys.apiKeysCreateApiKey({ apiKeyCreate: { name: newKeyName } });
       setNewlyCreatedKey(response);
+      setIsRegenerate(false);
       setCreateModalOpen(false);
       setNewKeyName("");
+      setCopied(false);
       fetchApiKeys();
     } catch (err) {
       const anError = err as Error;
@@ -73,6 +78,8 @@ export default function ApiKeysPage() {
       try {
         const response = await apiClient.api.apiKeys.apiKeysRegenerateApiKey({ apiKeyId: keyId });
         setNewlyCreatedKey(response);
+        setIsRegenerate(true);
+        setCopied(false);
         fetchApiKeys();
       } catch (err) {
         const anError = err as Error;
@@ -80,6 +87,13 @@ export default function ApiKeysPage() {
       }
       setIsMutating(false);
     }
+  };
+
+  const handleCopyKey = () => {
+    const keyToCopy = newlyCreatedKey?.plainKey || newlyCreatedKey?.plain_key || newlyCreatedKey?.key || '';
+    navigator.clipboard.writeText(keyToCopy);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   return (
@@ -142,15 +156,59 @@ export default function ApiKeysPage() {
         </div>
       </Modal>
 
-      {/* Show Newly Created Key Modal */}
-      <Modal isOpen={!!newlyCreatedKey} onClose={() => setNewlyCreatedKey(null)} title="API Key Created Successfully">
+      {/* Show Newly Created/Regenerated Key Modal */}
+      <Modal 
+        isOpen={!!newlyCreatedKey} 
+        onClose={() => { setNewlyCreatedKey(null); setCopied(false); }} 
+        title={isRegenerate ? "API Key Regenerated Successfully" : "API Key Created Successfully"}
+      >
         <div className="space-y-4">
-          <p className="text-sm text-gray-600 dark:text-gray-400">Please copy your new API key. You will not be able to see it again.</p>
-          <div className="p-3 font-mono text-sm bg-gray-100 rounded-md dark:bg-gray-700 dark:text-gray-300">
-            {newlyCreatedKey?.plain_key}
+          <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+            <p className="text-sm text-yellow-800 dark:text-yellow-200 font-medium">
+              ⚠️ Important: Save this key now!
+            </p>
+            <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
+              {isRegenerate 
+                ? "Your API key has been regenerated. The old key is now invalid and will no longer work."
+                : "This is the only time you'll be able to see the full API key. Make sure to copy it now."
+              }
+            </p>
           </div>
-          <div className="flex justify-end">
-            <Button onClick={() => setNewlyCreatedKey(null)}>Close</Button>
+
+          <div className="bg-gray-50 dark:bg-white/5 rounded-lg p-4 border border-gray-200 dark:border-white/10">
+            <Label className="mb-2">Full API Key</Label>
+            {(newlyCreatedKey?.plainKey || newlyCreatedKey?.plain_key || newlyCreatedKey?.key) ? (
+              <div className="relative">
+                <code className="block font-mono text-sm text-gray-800 dark:text-gray-200 bg-white dark:bg-gray-800 px-3 py-3 pr-12 rounded border border-gray-300 dark:border-gray-700 break-all">
+                  {newlyCreatedKey?.plainKey || newlyCreatedKey?.plain_key || newlyCreatedKey?.key}
+                </code>
+                <button
+                  onClick={handleCopyKey}
+                  className="absolute top-2 right-2 p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors rounded-md hover:bg-gray-100 dark:hover:bg-gray-700"
+                  title="Copy to clipboard"
+                >
+                  {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
+                </button>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-600 dark:text-gray-300">
+                The full key is only shown immediately after creation or regeneration.
+              </p>
+            )}
+          </div>
+
+          {copied && (
+            <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
+              <Check className="w-4 h-4" />
+              <span>Copied to clipboard!</span>
+            </div>
+          )}
+
+          <div className="flex justify-end gap-3 pt-2">
+            <Button onClick={handleCopyKey} variant="outline" disabled={!newlyCreatedKey?.plainKey && !newlyCreatedKey?.plain_key && !newlyCreatedKey?.key}>
+              {copied ? "Copied!" : "Copy Key"}
+            </Button>
+            <Button onClick={() => { setNewlyCreatedKey(null); setCopied(false); }}>I've Saved My Key</Button>
           </div>
         </div>
       </Modal>
