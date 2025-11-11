@@ -45,9 +45,12 @@ export default function AutoTopUp() {
   const [alert, setAlert] = useState<{ variant: 'success' | 'error' | 'warning' | 'info'; title: string; message: string } | null>(null);
 
   const [topUpAmount, setTopUpAmount] = useState('');
-  const [otp, setOtp] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [identityName, setIdentityName] = useState('');
+  const [isValidatingNumber, setIsValidatingNumber] = useState(false);
+  const [transactionUuid, setTransactionUuid] = useState('');
+  const [paymentReference, setPaymentReference] = useState('');
 
   const queryClient = useQueryClient();
 
@@ -97,48 +100,256 @@ export default function AutoTopUp() {
     staleTime: 60_000,
   });
 
-  const handleInitiateTopUp = () => {
+  // Validate phone number and get identity name
+  const validatePhoneNumber = async (msisdn: string): Promise<boolean> => {
+    setIsValidatingNumber(true);
+    try {
+      // Format phone number to include + prefix if not present
+      const formattedNumber = msisdn.startsWith('+') ? msisdn : `+${msisdn}`;
+      
+      const response = await fetch('https://lucopay-backend.vercel.app/identity/msisdn', {
+        method: 'POST',
+        headers: {
+          'accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ msisdn: formattedNumber }),
+      });
+
+      const data = await response.json();
+      
+      if (response.ok && data.success) {
+        setIdentityName(data.identityname);
+        setAlert({ 
+          variant: 'success', 
+          title: 'Number Verified', 
+          message: `Account holder: ${data.identityname}` 
+        });
+        return true;
+      } else {
+        setAlert({ 
+          variant: 'error', 
+          title: 'Validation Failed', 
+          message: data.message || 'Could not validate phone number' 
+        });
+        return false;
+      }
+    } catch {
+      setAlert({ 
+        variant: 'error', 
+        title: 'Validation Error', 
+        message: 'Failed to validate phone number. Please try again.' 
+      });
+      return false;
+    } finally {
+      setIsValidatingNumber(false);
+    }
+  };
+
+  // Initialize payment
+  const handleInitiateTopUp = async () => {
     const amount = parseFloat(topUpAmount);
     if (!amount || amount <= 0) return;
+    
     // Require phone number before proceeding
     if (!phoneNumber) {
-      setAlert({ variant: 'warning', title: 'Add Phone Number', message: 'Please add your phone number to receive the OTP.' });
+      setAlert({ variant: 'warning', title: 'Add Phone Number', message: 'Please add your phone number to receive the payment prompt.' });
       setShowNumberModal(true);
       return;
     }
 
-    setShowTopUpModal(false);
-    setShowOTPModal(true);
     setIsProcessing(true);
+    
+    try {
+      // Generate a unique reference using UUID format
+      const reference = crypto.randomUUID();
+      setPaymentReference(reference);
+      
+      // Format phone number (remove + and country code for the API)
+      let formattedPhone = phoneNumber.replace(/\D/g, '');
+      if (formattedPhone.startsWith('256')) {
+        formattedPhone = '0' + formattedPhone.substring(3);
+      }
+      
+      // Ensure amount is an integer
+      const amountInt = Math.round(amount);
+      
+      const payload = {
+        amount: amountInt,
+        callback_url: 'https://mintospay.vercel.app/v1/pay/webhook/callback',
+        country: 'UG',
+        description: 'Payment for services',
+        phone_number: formattedPhone,
+        reference: reference,
+      };
+      
+      console.log('Payment payload:', payload);
+      
+      const response = await fetch('https://mintospay.vercel.app/v1/pay/initialize', {
+        method: 'POST',
+        headers: {
+          'accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
 
-    setTimeout(() => setIsProcessing(false), 1200);
+      const data = await response.json();
+      console.log('Payment response:', data);
+      
+      if (response.status === 201 && data.status === 'success') {
+        const uuid = data.data.transaction.uuid;
+        setTransactionUuid(uuid);
+        
+        setShowTopUpModal(false);
+        setShowOTPModal(true);
+        
+        setAlert({ 
+          variant: 'info', 
+          title: 'Payment Initiated', 
+          message: `Check your phone (${maskNumber(phoneNumber)}) to approve the payment.` 
+        });
+        
+        // Start polling for payment status
+        pollPaymentStatus(uuid, amountInt);
+      } else {
+        // Handle validation errors (422) or other errors
+        let errorMessage = 'Could not initiate payment. Please try again.';
+        
+        if (response.status === 422 && data.detail) {
+          // Extract validation error details
+          if (Array.isArray(data.detail)) {
+            errorMessage = data.detail.map((err: { loc?: string[]; msg: string }) => 
+              `${err.loc?.join('.') || 'field'}: ${err.msg}`
+            ).join(', ');
+          } else if (typeof data.detail === 'string') {
+            errorMessage = data.detail;
+          }
+        } else if (data.message) {
+          errorMessage = data.message;
+        }
+        
+        console.error('Payment initialization failed:', data);
+        
+        setAlert({ 
+          variant: 'error', 
+          title: 'Payment Failed', 
+          message: errorMessage
+        });
+        setIsProcessing(false);
+      }
+    } catch {
+      setAlert({ 
+        variant: 'error', 
+        title: 'Payment Error', 
+        message: 'Failed to initiate payment. Please check your connection and try again.' 
+      });
+      setIsProcessing(false);
+    }
   };
 
-  const handleVerifyOTP = async () => {
-    if (otp.length !== 6) return;
-    setIsProcessing(true);
-
-    setTimeout(async () => {
-      const success = Math.random() > 0.25; // 75% success
-      if (success) {
-        const amount = parseFloat(topUpAmount);
-        // Simulate successful payment then persist via API
-        await addFundsMutation.mutateAsync({
-          amount,
-          paymentMethod: 'Card',
-          referenceNumber: 'TOPUP-' + Date.now(),
+  // Poll payment status using transaction UUID
+  const pollPaymentStatus = async (uuid: string, amount: number) => {
+    const maxAttempts = 30; // Poll for up to 5 minutes (30 * 10 seconds)
+    let attempts = 0;
+    
+    const checkStatus = async () => {
+      try {
+        const response = await fetch(`https://mintospay.vercel.app/v1/pay/verify/${uuid}`, {
+          method: 'GET',
+          headers: {
+            'accept': 'application/json',
+          },
         });
-        // Invalidate transactions query to refetch
-        await queryClient.invalidateQueries({ queryKey: ['transactions'] });
-        setAlert({ variant: 'success', title: 'Top-Up Successful!', message: `UGx ${amount.toFixed(2)} added to your balance.` });
-      } else {
-        setAlert({ variant: 'error', title: 'Top-Up Failed', message: 'Invalid OTP or payment declined. Please try again.' });
+
+        const data = await response.json();
+        
+        if (response.ok && data.status === 'success') {
+          const txStatus = data.data.transaction.status;
+          
+          if (txStatus === 'completed' || txStatus === 'success') {
+            // Payment successful - add funds to wallet
+            await addFundsMutation.mutateAsync({
+              amount,
+              paymentMethod: data.data.collection.provider || 'Mobile Money',
+              referenceNumber: paymentReference,
+            });
+            
+            await queryClient.invalidateQueries({ queryKey: ['transactions'] });
+            await queryClient.invalidateQueries({ queryKey: ['wallet'] });
+            
+            setAlert({ 
+              variant: 'success', 
+              title: 'Top-Up Successful!', 
+              message: `UGx ${amount.toFixed(2)} added to your balance.` 
+            });
+            
+            setIsProcessing(false);
+            setShowOTPModal(false);
+            
+            setTopUpAmount('');
+            setTransactionUuid('');
+            return;
+          } else if (txStatus === 'failed' || txStatus === 'cancelled') {
+            setAlert({ 
+              variant: 'error', 
+              title: 'Payment Failed', 
+              message: 'Payment was declined or cancelled. Please try again.' 
+            });
+            
+            setIsProcessing(false);
+            setShowOTPModal(false);
+            setTopUpAmount('');
+            setTransactionUuid('');
+            return;
+          } else if (txStatus === 'processing' || txStatus === 'pending') {
+            // Continue polling
+            attempts++;
+            if (attempts < maxAttempts) {
+              setTimeout(checkStatus, 10000); // Check every 10 seconds
+            } else {
+              setAlert({ 
+                variant: 'warning', 
+                title: 'Payment Pending', 
+                message: 'Payment is taking longer than expected. Please check your transaction history.' 
+              });
+              setIsProcessing(false);
+              setShowOTPModal(false);
+            }
+          }
+        } else {
+          // Error fetching status, retry
+          attempts++;
+          if (attempts < maxAttempts) {
+            setTimeout(checkStatus, 10000);
+          } else {
+            setAlert({ 
+              variant: 'error', 
+              title: 'Verification Error', 
+              message: 'Could not verify payment status. Please check your transaction history.' 
+            });
+            setIsProcessing(false);
+            setShowOTPModal(false);
+          }
+        }
+      } catch {
+        attempts++;
+        if (attempts < maxAttempts) {
+          setTimeout(checkStatus, 10000);
+        } else {
+          setAlert({ 
+            variant: 'error', 
+            title: 'Verification Error', 
+            message: 'Could not verify payment status. Please check your transaction history.' 
+          });
+          setIsProcessing(false);
+          setShowOTPModal(false);
+        }
       }
-      setIsProcessing(false);
-      setShowOTPModal(false);
-      setOtp('');
-      setTopUpAmount('');
-    }, 1800);
+    };
+    
+    // Start polling after 5 seconds (give time for payment to be initiated)
+    setTimeout(checkStatus, 5000);
   };
 
   const resetModals = () => {
@@ -146,7 +357,8 @@ export default function AutoTopUp() {
     setShowOTPModal(false);
     setShowNumberModal(false);
     setTopUpAmount('');
-    setOtp('');
+    setIsProcessing(false);
+    setTransactionUuid('');
   };
 
   const maskNumber = (num: string) => {
@@ -200,7 +412,9 @@ export default function AutoTopUp() {
               <div className="mt-3 flex items-center gap-2 text-xs opacity-90">
                 <Phone className="h-3.5 w-3.5" />
                 {phoneNumber ? (
-                  <span>OTP will be sent to {maskNumber(phoneNumber)}</span>
+                  <span>
+                    {identityName ? `${identityName} - ` : ''}{maskNumber(phoneNumber)}
+                  </span>
                 ) : (
                   <span>No phone number added</span>
                 )}
@@ -410,41 +624,33 @@ export default function AutoTopUp() {
               </div>
               <div>
                 <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
-                  Enter OTP
+                  Approve Payment
                 </h3>
                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                  Check your phone for 6-digit code {phoneNumber ? `sent to ${maskNumber(phoneNumber)}` : ''}
+                  Check your phone {phoneNumber ? `(${maskNumber(phoneNumber)})` : ''} to approve the payment
                 </p>
               </div>
             </div>
 
             <div className="space-y-5">
-              <Input
-                type="text"
-                placeholder="000000"
-                value={otp}
-                onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                className="text-center text-2xl font-mono tracking-widest"
-                // maxLength={6}
-              />
+              <div className="rounded-lg bg-blue-50 dark:bg-blue-900/20 p-4 text-center">
+                <Loader2 className="mx-auto h-12 w-12 animate-spin text-brand-600 dark:text-brand-400" />
+                <p className="mt-3 text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Waiting for payment approval...
+                </p>
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  This may take a few moments
+                </p>
+                {transactionUuid && (
+                  <p className="mt-2 text-xs text-gray-400 dark:text-gray-500 font-mono">
+                    Ref: {transactionUuid.slice(0, 8)}...
+                  </p>
+                )}
+              </div>
 
               <div className="flex gap-3">
                 <Button variant="outline" onClick={resetModals} className="flex-1" disabled={isProcessing}>
                   Cancel
-                </Button>
-                <Button
-                  onClick={handleVerifyOTP}
-                  disabled={otp.length !== 6 || isProcessing}
-                  className="flex-1"
-                >
-                  {isProcessing ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Verifying...
-                    </>
-                  ) : (
-                    'Verify & Add'
-                  )}
                 </Button>
               </div>
             </div>
@@ -475,9 +681,18 @@ export default function AutoTopUp() {
                   type="tel"
                   placeholder="e.g. 256712345678"
                   value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value.replace(/[^\d+]/g, ''))}
+                  onChange={(e) => {
+                    setPhoneNumber(e.target.value.replace(/[^\d+]/g, ''));
+                    setIdentityName(''); // Clear identity name when number changes
+                  }}
                 />
                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Use your active number. Format: countrycode + number (e.g., 2567xxxxxxx)</p>
+                {identityName && (
+                  <p className="mt-2 text-sm text-green-600 dark:text-green-400 flex items-center gap-1">
+                    <CheckCircle className="h-4 w-4" />
+                    Account holder: {identityName}
+                  </p>
+                )}
               </div>
 
               <div className="flex gap-3">
@@ -485,11 +700,25 @@ export default function AutoTopUp() {
                   Cancel
                 </Button>
                 <Button
-                  onClick={() => setShowNumberModal(false)}
-                  disabled={!phoneNumber || phoneNumber.replace(/\D/g, '').length < 9}
+                  onClick={async () => {
+                    if (phoneNumber && phoneNumber.replace(/\D/g, '').length >= 9) {
+                      const isValid = await validatePhoneNumber(phoneNumber);
+                      if (isValid) {
+                        setShowNumberModal(false);
+                      }
+                    }
+                  }}
+                  disabled={!phoneNumber || phoneNumber.replace(/\D/g, '').length < 9 || isValidatingNumber}
                   className="flex-1"
                 >
-                  Save Number
+                  {isValidatingNumber ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Validating...
+                    </>
+                  ) : (
+                    'Verify & Save'
+                  )}
                 </Button>
               </div>
             </div>
