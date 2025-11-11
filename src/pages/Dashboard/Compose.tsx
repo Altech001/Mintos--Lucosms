@@ -163,42 +163,78 @@ export default function ComposePage() {
     return fallback;
   };
 
-  // Strict E.164 formatting using libphonenumber-js; enforce +256
+  // Format phone numbers to E.164 format (+256xxxxxxxxx)
+  // Handles various input formats:
+  // - 7xx, 70x, 77x, 78x, 79x → +2567xx
+  // - 070x, 075x, 077x, 078x, 079x → +2567xx (removes leading 0)
+  // - 2567xx → +2567xx
+  // - +2567xx → +2567xx (already formatted)
   const DEFAULT_CC = (import.meta as any).env?.VITE_DEFAULT_COUNTRY_CODE as string | undefined;
   const normalizePhones = (raw: string[]): { valid: string[]; invalid: number } => {
     const result = new Set<string>();
     let invalid = 0;
+    
     for (const n of raw) {
       let input = (n || '').toString().trim();
-      if (!input) { invalid++; continue; }
-      // Ensure plus-only starts or local digits
+      if (!input) { 
+        invalid++; 
+        continue; 
+      }
+      
+      // Remove all non-digit characters except +
       input = input.replace(/[^+\d]/g, '');
-      // Special pre-format rules for UG numbers as requested:
-      // - '7'       => '+2567'
-      // - starting with '7' => '+256' + rest
-      // - '256'     => '+2567'
-      // - starting with '256' (no plus) => '+' + rest
-      if (input === '7') {
-        input = '+2567';
-      } else if (/^7\d*/.test(input)) {
+      
+      // Format Uganda numbers to +256 format
+      // Case 1: Starts with 7 (local format without 0) → +2567xx
+      if (/^7\d{8}$/.test(input)) {
         input = '+256' + input;
-      } else if (input === '256') {
-        input = '+2567';
-      } else if (/^256\d*/.test(input)) {
+      }
+      // Case 2: Starts with 07 (local format with 0) → +2567xx (remove leading 0)
+      else if (/^07\d{8}$/.test(input)) {
+        input = '+256' + input.substring(1);
+      }
+      // Case 3: Starts with 256 (country code without +) → +2567xx
+      else if (/^256\d{9}$/.test(input)) {
         input = '+' + input;
       }
+      // Case 4: Already has + prefix → validate it
+      else if (input.startsWith('+')) {
+        // Keep as is, will be validated below
+      }
+      // Case 5: Short numbers like just "7" or "70" → add +256
+      else if (/^7\d*$/.test(input) && input.length < 9) {
+        input = '+256' + input;
+      }
+      // Case 6: Starts with 0 but not 07 pattern → remove 0 and add +256
+      else if (/^0\d+$/.test(input)) {
+        input = '+256' + input.substring(1);
+      }
+      
       try {
+        // Parse and validate using libphonenumber-js
         const pn = input.startsWith('+')
           ? parsePhoneNumberFromString(input)
           : parsePhoneNumberFromString((DEFAULT_CC || '+256') + input.replace(/^0+/, ''));
-        if (!pn || !pn.isValid()) { invalid++; continue; }
-        const e164 = pn.number; // already in +CCCxxxxxxxx format
-        if (!e164.startsWith('+256')) { invalid++; continue; }
+          
+        if (!pn || !pn.isValid()) { 
+          invalid++; 
+          continue; 
+        }
+        
+        const e164 = pn.number; // E.164 format: +CCCxxxxxxxxx
+        
+        // Only accept Uganda numbers (+256)
+        if (!e164.startsWith('+256')) { 
+          invalid++; 
+          continue; 
+        }
+        
         result.add(e164);
       } catch {
         invalid++;
       }
     }
+    
     return { valid: Array.from(result), invalid };
   };
 
@@ -1331,22 +1367,28 @@ export default function ComposePage() {
             <div className="flex-1 overflow-y-auto p-6 space-y-2">
               {groups
                 .find((g) => g.id === showPreview)
-                ?.contacts.map((c, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center gap-3 p-3 bg-gray-50 dark:text-white text-xs dark:bg-gray-700 rounded-lg"
-                  >
-                    <div className="w-10 h-10 bg-brand-600  rounded-full flex items-center justify-center text-white text-sm font-bold">
-                      {c.name[0]}
+                ?.contacts.map((c, i) => {
+                  // Format phone number for display
+                  const formatted = normalizePhones([c.phone]);
+                  const displayPhone = formatted.valid.length > 0 ? formatted.valid[0] : c.phone;
+                  
+                  return (
+                    <div
+                      key={i}
+                      className="flex items-center gap-3 p-3 bg-gray-50 dark:text-white text-xs dark:bg-gray-700 rounded-lg"
+                    >
+                      <div className="w-10 h-10 bg-brand-600  rounded-full flex items-center justify-center text-white text-sm font-bold">
+                        {c.name[0]}
+                      </div>
+                      <div>
+                        <p className="font-medium">{c.name}</p>
+                        <p className="text-sm text-gray-600 dark:text-gray-300">
+                          {displayPhone}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-medium">{c.name}</p>
-                      <p className="text-sm text-gray-600 dark:text-gray-300">
-                        {c.phone}
-                      </p>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
             </div>
           </div>
         </div>

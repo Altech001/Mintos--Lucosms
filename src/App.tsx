@@ -19,7 +19,6 @@ import TicketsPage from "./pages/Extension/Tickets";
 import ActivityLogs from "./pages/Logs/ActivityLogs";
 import NotFound from "./pages/NoRoute/NotFound";
 import Notifications from "./pages/Notifications/Notifications";
-import Subscribptions from "./pages/Packages/Subscribptions";
 import ProfilePage from "./pages/Profile/Profile";
 import Transactions from "./pages/Recents/Billings";
 import RecentHistory from "./pages/Recents/RecentHistory";
@@ -54,7 +53,7 @@ export default function App() {
               <Route path="/logs" element={<ActivityLogs />} />
               <Route path="/notifications" element={<Notifications />} />
               <Route path="/developer/api-keys" element={<ApiKeysPage />} />
-              <Route path="/subscriptions" element={<Subscribptions />} />
+              {/* <Route path="/subscriptions" element={<Subscribptions />} /> */}
             </Route>
           </Route>
 

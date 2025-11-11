@@ -4,6 +4,7 @@ import Button from "../../components/ui/button/Button";
 import { PlanInfo } from "../../lib/api/models";
 import Skeleton from "../../components/ui/Skeleton";
 import Input from "../../components/form/input/InputField";
+import { CheckCircle, User, Phone, FileText, Send } from "lucide-react";
 
 export default function SettingsPage() {
   const { user, apiClient, checkAuth, logout } = useAuth();
@@ -12,7 +13,6 @@ export default function SettingsPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
   const [isLoadingPlans, setIsLoadingPlans] = useState(true);
-  const [isChangingPlan, setIsChangingPlan] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
@@ -23,9 +23,12 @@ export default function SettingsPage() {
   const [promoError, setPromoError] = useState<string | null>(null);
   const [promoSuccess, setPromoSuccess] = useState<string | null>(null);
   const [isChangePlanModalOpen, setIsChangePlanModalOpen] = useState(false);
-  const [bidAmount, setBidAmount] = useState("");
+  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
+  const [fullName, setFullName] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
+  const [description, setDescription] = useState("");
   const [changePlanError, setChangePlanError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLowBalanceModalOpen, setIsLowBalanceModalOpen] = useState(false);
   const [lowBalanceThreshold, setLowBalanceThreshold] = useState<string>(() => {
     const saved = localStorage.getItem('lowBalanceThreshold');
@@ -53,47 +56,56 @@ export default function SettingsPage() {
   const openChangePlanModal = () => {
     if (!selectedPlan) return;
     setIsChangePlanModalOpen(true);
-    setBidAmount("");
+    setFullName(user?.fullName || "");
     setPhoneNumber("");
+    setDescription("");
     setChangePlanError(null);
   };
 
-  const handleChangePlan = async () => {
-    if (!selectedPlan) return;
-    
+  const handleProceedToPreview = () => {
     // Validate inputs
-    if (!bidAmount.trim()) {
-      setChangePlanError("Please enter the bid amount.");
+    if (!fullName.trim()) {
+      setChangePlanError("Please enter your full name.");
       return;
     }
     if (!phoneNumber.trim()) {
       setChangePlanError("Please enter your phone number.");
       return;
     }
-    
-    const amount = parseFloat(bidAmount);
-    if (isNaN(amount) || amount <= 0) {
-      setChangePlanError("Please enter a valid amount.");
+    if (!description.trim()) {
+      setChangePlanError("Please provide a description.");
       return;
     }
     
-    setError(null);
-    setMessage(null);
+    // Show preview modal
     setChangePlanError(null);
-    setIsChangingPlan(true);
+    setIsChangePlanModalOpen(false);
+    setIsPreviewModalOpen(true);
+  };
+
+  const handleSubmitForApproval = async () => {
+    setIsSubmitting(true);
+    setError(null);
+    
     try {
-      await apiClient.api.userData.userDataChangePlan({ changePlanRequest: { newPlan: selectedPlan } });
-      await checkAuth(); // Refresh user data
-      setMessage(`Successfully changed to the ${selectedPlan} plan! Bid: ${amount} UGX for phone: ${phoneNumber}`);
-      setIsChangePlanModalOpen(false);
-      setBidAmount("");
+      // TODO: Add API call to submit plan change request for admin approval
+      // This will be implemented when admin privileges are added
+      
+      // Simulate submission
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      setMessage(`Plan change request submitted successfully! Your request to change to the ${selectedPlan} plan is pending admin approval.`);
+      setIsPreviewModalOpen(false);
+      setFullName("");
       setPhoneNumber("");
+      setDescription("");
       setSelectedPlan(null);
     } catch (err) {
       const anError = err as Error;
-      setChangePlanError(anError.message || "Failed to change plan.");
+      setError(anError.message || "Failed to submit plan change request.");
+    } finally {
+      setIsSubmitting(false);
     }
-    setIsChangingPlan(false);
   };
 
   const handleSaveLowBalanceThreshold = () => {
@@ -213,7 +225,7 @@ export default function SettingsPage() {
       {selectedPlan && (
         <div className="mt-8 text-center">
           <p className="mb-4 text-lg text-gray-800 dark:text-white">You have selected the <strong>{selectedPlan}</strong> plan.</p>
-          <Button onClick={openChangePlanModal} size="md">Continue to Payment</Button>
+          <Button onClick={openChangePlanModal} size="md">Request Plan Change</Button>
         </div>
       )}
 
@@ -266,34 +278,62 @@ export default function SettingsPage() {
       {isChangePlanModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl max-w-lg w-full p-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Change to {selectedPlan} Plan</h3>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Request Plan Change</h3>
             <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
-              Enter the bid amount and your phone number to proceed with the plan change.
+              Fill in the details below to submit your plan change request for admin approval.
             </p>
+            
+            {/* Plan Info Card */}
+            <div className="mb-4 p-4 bg-brand-50 dark:bg-brand-900/20 rounded-lg border border-brand-200 dark:border-brand-800">
+              <div className="flex justify-between items-center">
+                <div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Selected Plan</p>
+                  <p className="text-lg font-semibold text-gray-900 dark:text-white">{selectedPlan}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">SMS Cost</p>
+                  <p className="text-lg font-semibold text-brand-600 dark:text-brand-400">{plans[selectedPlan || '']?.smsCost} UGX</p>
+                </div>
+              </div>
+            </div>
+
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Bid Amount (UGX)
+                  <User className="inline h-4 w-4 mr-1" />
+                  Full Name
                 </label>
                 <Input
-                  type="number"
-                  placeholder="e.g., 1000 (1 = 28 UGX per SMS)"
-                  value={bidAmount}
-                  onChange={(e) => setBidAmount(e.target.value)}
+                  type="text"
+                  placeholder="Enter your full name"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
                 />
-                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  Example: 1000 UGX = 28 UGX per SMS
-                </p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <Phone className="inline h-4 w-4 mr-1" />
                   Phone Number
                 </label>
                 <Input
                   type="tel"
-                  placeholder="Enter your phone number"
+                  placeholder="e.g. 256712345678"
                   value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  onChange={(e) => setPhoneNumber(e.target.value.replace(/[^\d+]/g, ''))}
+                />
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Format: countrycode + number (e.g., 2567xxxxxxx)</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <FileText className="inline h-4 w-4 mr-1" />
+                  Description
+                </label>
+                <textarea
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:border-transparent resize-none"
+                  rows={3}
+                  placeholder="Explain why you want to change to this plan..."
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
                 />
               </div>
               {changePlanError && (
@@ -303,11 +343,10 @@ export default function SettingsPage() {
             <div className="flex justify-end gap-3 mt-6">
               <Button variant="outline" onClick={() => setIsChangePlanModalOpen(false)}>Cancel</Button>
               <Button
-                onClick={handleChangePlan}
-                isLoading={isChangingPlan}
-                disabled={!bidAmount.trim() || !phoneNumber.trim() || isChangingPlan}
+                onClick={handleProceedToPreview}
+                disabled={!fullName.trim() || !phoneNumber.trim() || !description.trim()}
               >
-                Confirm Change
+                Preview Request
               </Button>
             </div>
           </div>
@@ -375,6 +414,94 @@ export default function SettingsPage() {
                 disabled={!promoCode.trim() || isApplyingPromo}
               >
                 Apply Code
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Preview & Submit Modal */}
+      {isPreviewModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl dark:bg-gray-900">
+            <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+              Review Your Request
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+              Please review the details below before submitting for admin approval.
+            </p>
+
+            <div className="space-y-4">
+              {/* Plan Details */}
+              <div className="p-4 bg-gradient-to-br from-brand-50 to-brand-100 dark:from-brand-900/20 dark:to-brand-800/20 rounded-lg border border-brand-200 dark:border-brand-800">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Plan</span>
+                  <span className="text-lg font-bold text-brand-600 dark:text-brand-400">{selectedPlan}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">SMS Cost</span>
+                  <span className="text-lg font-bold text-brand-600 dark:text-brand-400">{plans[selectedPlan || '']?.smsCost} UGX</span>
+                </div>
+              </div>
+
+              {/* User Details */}
+              <div className="space-y-3 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <User className="h-5 w-5 text-gray-500 dark:text-gray-400 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Full Name</p>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">{fullName}</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Phone className="h-5 w-5 text-gray-500 dark:text-gray-400 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Phone Number</p>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">{phoneNumber}</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <FileText className="h-5 w-5 text-gray-500 dark:text-gray-400 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Description</p>
+                    <p className="text-sm text-gray-700 dark:text-gray-300">{description}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Info Alert */}
+              <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                <p className="text-xs text-blue-700 dark:text-blue-300">
+                  <CheckCircle className="inline h-4 w-4 mr-1" />
+                  Your request will be reviewed by an administrator. You'll be notified once it's approved.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setIsPreviewModalOpen(false);
+                  setIsChangePlanModalOpen(true);
+                }} 
+                className="flex-1"
+                disabled={isSubmitting}
+              >
+                Back
+              </Button>
+              <Button 
+                onClick={handleSubmitForApproval}
+                isLoading={isSubmitting}
+                disabled={isSubmitting}
+                className="flex-1"
+              >
+                {isSubmitting ? 'Submitting...' : (
+                  <>
+                    <Send className="mr-2 h-4 w-4" />
+                    Send for Approval
+                  </>
+                )}
               </Button>
             </div>
           </div>

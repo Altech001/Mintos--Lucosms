@@ -8,13 +8,21 @@ import {
   Mail,
   QrCode,
   Smartphone,
-  X
+  X,
+  Loader2,
+  Phone,
+  Shield
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import PageBreadcrumb from "../../components/common/PageBreadCrumb";
 import PageMeta from "../../components/common/PageMeta";
 import Input from "../../components/form/input/InputField";
 import Button from "../../components/ui/button/Button";
+import Alert from "../../components/ui/alert/Alert";
+import Label from "../../components/form/Label";
+import { useAuth } from '../../context/AuthContext';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import type { AddFundsRequest } from "../../lib/api";
 
 // ──────────────────────────────────────────────────────────────────────
 // Types
@@ -73,30 +81,62 @@ const initialIntegrations: Integration[] = [
 // Main Component
 // ──────────────────────────────────────────────────────────────────────
 export default function SettingsPage() {
+  const { apiClient } = useAuth();
+  const queryClient = useQueryClient();
+  
   const [senders, setSenders] = useState<SenderId[]>(senderIds);
   const [integrations, setIntegrations] = useState<Integration[]>(initialIntegrations);
-
 
   // Modals
   const [priceModal, setPriceModal] = useState<SenderId | null>(null);
   const [connectModal, setConnectModal] = useState<Integration | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteInput, setDeleteInput] = useState('');
-
   const [showAddNumber, setShowAddNumber] = useState(false);
+  
+  // Payment states
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showOTPModal, setShowOTPModal] = useState(false);
+  const [showNumberModal, setShowNumberModal] = useState(false);
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [identityName, setIdentityName] = useState('');
+  const [isValidatingNumber, setIsValidatingNumber] = useState(false);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [transactionUuid, setTransactionUuid] = useState('');
+  const [selectedSenderForPayment, setSelectedSenderForPayment] = useState<SenderId | null>(null);
+  const [alert, setAlert] = useState<{ variant: 'success' | 'error' | 'warning' | 'info'; title: string; message: string } | null>(null);
+
+  // Add funds mutation
+  const addFundsMutation = useMutation({
+    mutationFn: async (payload: AddFundsRequest) =>
+      apiClient.api.userData.userDataAddFundsToWallet({ addFundsRequest: payload }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['wallet'] });
+      await queryClient.invalidateQueries({ queryKey: ['transactions'] });
+    },
+  });
 
   // ──────────────────────────────────────────────────────────────────────
   // Handlers
   // ──────────────────────────────────────────────────────────────────────
   const selectSender = (sender: SenderId) => {
     if (sender.isActive) return;
+    setSelectedSenderForPayment(sender);
+    setShowPaymentModal(true);
+  };
+
+  const confirmSenderChange = () => {
+    if (!selectedSenderForPayment) return;
     setSenders(prev =>
       prev.map(s => ({
         ...s,
-        isActive: s.id === sender.id,
+        isActive: s.id === selectedSenderForPayment.id,
       }))
     );
-    setPriceModal(sender);
+    setPriceModal(selectedSenderForPayment);
+    setShowPaymentModal(false);
+    setShowOTPModal(false);
+    setSelectedSenderForPayment(null);
   };
 
   const toggleIntegration = (id: string) => {
@@ -116,8 +156,280 @@ export default function SettingsPage() {
 
   const handleDeleteAccount = () => {
     if (deleteInput !== 'DELETE') return;
-    alert('Account deleted! (real app → API + logout)');
+    setAlert({ 
+      variant: 'success', 
+      title: 'Account Deleted', 
+      message: 'Your account has been successfully deleted.' 
+    });
   };
+
+  const maskNumber = (num: string) => {
+    const digits = num.replace(/\D/g, '');
+    if (digits.length <= 4) return digits;
+    return `${digits.slice(0, 3)}***${digits.slice(-3)}`;
+  };
+
+  // Validate phone number
+  const validatePhoneNumber = async (msisdn: string): Promise<boolean> => {
+    setIsValidatingNumber(true);
+    try {
+      const formattedNumber = msisdn.startsWith('+') ? msisdn : `+${msisdn}`;
+      
+      const response = await fetch('https://lucopay-backend.vercel.app/identity/msisdn', {
+        method: 'POST',
+        headers: {
+          'accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ msisdn: formattedNumber }),
+      });
+
+      const data = await response.json();
+      
+      if (response.ok && data.success) {
+        setIdentityName(data.identityname);
+        setAlert({ 
+          variant: 'success', 
+          title: 'Number Verified', 
+          message: `Account holder: ${data.identityname}` 
+        });
+        return true;
+      } else {
+        setAlert({ 
+          variant: 'error', 
+          title: 'Validation Failed', 
+          message: data.message || 'Could not validate phone number' 
+        });
+        return false;
+      }
+    } catch {
+      setAlert({ 
+        variant: 'error', 
+        title: 'Validation Error', 
+        message: 'Failed to validate phone number. Please try again.' 
+      });
+      return false;
+    } finally {
+      setIsValidatingNumber(false);
+    }
+  };
+
+  // Calculate payment amount (difference in price)
+  const calculatePaymentAmount = () => {
+    if (!selectedSenderForPayment) return 0;
+    const currentSender = senders.find(s => s.isActive);
+    if (!currentSender) return selectedSenderForPayment.priceUgx;
+    
+    // Calculate based on price difference for 100 SMS as a base
+    const priceDiff = Math.abs(selectedSenderForPayment.priceUgx - currentSender.priceUgx);
+    return priceDiff * 100; // Base calculation on 100 SMS
+  };
+
+  // Initialize payment
+  const handleInitiatePayment = async () => {
+    const amount = calculatePaymentAmount();
+    if (!amount || amount <= 0) {
+      // If no payment needed, just change sender
+      confirmSenderChange();
+      return;
+    }
+    
+    if (!phoneNumber) {
+      setAlert({ variant: 'warning', title: 'Add Phone Number', message: 'Please add your phone number to receive the payment prompt.' });
+      setShowNumberModal(true);
+      return;
+    }
+
+    setIsProcessingPayment(true);
+    
+    try {
+      const reference = crypto.randomUUID();
+      
+      let formattedPhone = phoneNumber.replace(/\D/g, '');
+      if (formattedPhone.startsWith('256')) {
+        formattedPhone = '0' + formattedPhone.substring(3);
+      }
+      
+      const amountInt = Math.round(amount);
+      
+      const payload = {
+        amount: amountInt,
+        callback_url: 'https://mintospay.vercel.app/v1/pay/webhook/callback',
+        country: 'UG',
+        description: `Sender ID Change - ${selectedSenderForPayment?.name} (${selectedSenderForPayment?.priceUgx} UGX/SMS)`,
+        phone_number: formattedPhone,
+        reference: reference,
+      };
+      
+      const response = await fetch('https://mintospay.vercel.app/v1/pay/initialize', {
+        method: 'POST',
+        headers: {
+          'accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await response.json();
+      
+      if (response.status === 201 && data.status === 'success') {
+        const uuid = data.data.transaction.uuid;
+        setTransactionUuid(uuid);
+        
+        setShowPaymentModal(false);
+        setShowOTPModal(true);
+        
+        setAlert({ 
+          variant: 'info', 
+          title: 'Payment Initiated', 
+          message: `Check your phone (${maskNumber(phoneNumber)}) to approve the payment.` 
+        });
+        
+        pollPaymentStatus(uuid, amountInt, reference);
+      } else {
+        let errorMessage = 'Could not initiate payment. Please try again.';
+        
+        if (response.status === 422 && data.detail) {
+          if (Array.isArray(data.detail)) {
+            errorMessage = data.detail.map((err: { loc?: string[]; msg: string }) => 
+              `${err.loc?.join('.') || 'field'}: ${err.msg}`
+            ).join(', ');
+          } else if (typeof data.detail === 'string') {
+            errorMessage = data.detail;
+          }
+        } else if (data.message) {
+          errorMessage = data.message;
+        }
+        
+        setAlert({ 
+          variant: 'error', 
+          title: 'Payment Failed', 
+          message: errorMessage
+        });
+        setIsProcessingPayment(false);
+      }
+    } catch {
+      setAlert({ 
+        variant: 'error', 
+        title: 'Payment Error', 
+        message: 'Failed to initiate payment. Please check your connection and try again.' 
+      });
+      setIsProcessingPayment(false);
+    }
+  };
+
+  // Poll payment status
+  const pollPaymentStatus = async (uuid: string, amount: number, reference: string) => {
+    const maxAttempts = 30;
+    let attempts = 0;
+    
+    const checkStatus = async () => {
+      try {
+        const response = await fetch(`https://mintospay.vercel.app/v1/pay/verify/${uuid}`, {
+          method: 'GET',
+          headers: {
+            'accept': 'application/json',
+          },
+        });
+
+        const data = await response.json();
+        
+        if (response.ok && data.status === 'success') {
+          const txStatus = data.data.transaction.status;
+          
+          if (txStatus === 'completed' || txStatus === 'success') {
+            // Payment successful - add funds to wallet and change sender
+            await addFundsMutation.mutateAsync({
+              amount,
+              paymentMethod: data.data.collection.provider || 'Mobile Money',
+              referenceNumber: reference,
+            });
+            
+            confirmSenderChange();
+            
+            setAlert({ 
+              variant: 'success', 
+              title: 'Payment Successful!', 
+              message: `UGx ${amount.toFixed(2)} paid. Sender ID changed to ${selectedSenderForPayment?.name}.` 
+            });
+            
+            setIsProcessingPayment(false);
+            setShowOTPModal(false);
+            setTransactionUuid('');
+            return;
+          } else if (txStatus === 'failed' || txStatus === 'cancelled') {
+            setAlert({ 
+              variant: 'error', 
+              title: 'Payment Failed', 
+              message: 'Payment was declined or cancelled. Please try again.' 
+            });
+            
+            setIsProcessingPayment(false);
+            setShowOTPModal(false);
+            setTransactionUuid('');
+            return;
+          } else if (txStatus === 'processing' || txStatus === 'pending') {
+            attempts++;
+            if (attempts < maxAttempts) {
+              setTimeout(checkStatus, 10000);
+            } else {
+              setAlert({ 
+                variant: 'warning', 
+                title: 'Payment Pending', 
+                message: 'Payment is taking longer than expected. Please check your transaction history.' 
+              });
+              setIsProcessingPayment(false);
+              setShowOTPModal(false);
+            }
+          }
+        } else {
+          attempts++;
+          if (attempts < maxAttempts) {
+            setTimeout(checkStatus, 10000);
+          } else {
+            setAlert({ 
+              variant: 'error', 
+              title: 'Verification Error', 
+              message: 'Could not verify payment status. Please check your transaction history.' 
+            });
+            setIsProcessingPayment(false);
+            setShowOTPModal(false);
+          }
+        }
+      } catch {
+        attempts++;
+        if (attempts < maxAttempts) {
+          setTimeout(checkStatus, 10000);
+        } else {
+          setAlert({ 
+            variant: 'error', 
+            title: 'Verification Error', 
+            message: 'Could not verify payment status. Please check your transaction history.' 
+          });
+          setIsProcessingPayment(false);
+          setShowOTPModal(false);
+        }
+      }
+    };
+    
+    setTimeout(checkStatus, 5000);
+  };
+
+  const resetPaymentModals = () => {
+    setShowPaymentModal(false);
+    setShowOTPModal(false);
+    setShowNumberModal(false);
+    setIsProcessingPayment(false);
+    setTransactionUuid('');
+    setSelectedSenderForPayment(null);
+  };
+
+  useEffect(() => {
+    if (alert) {
+      const timer = setTimeout(() => setAlert(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [alert]);
 
   // ──────────────────────────────────────────────────────────────────────
   // Render
@@ -126,6 +438,18 @@ export default function SettingsPage() {
     <div>
       <PageMeta title="Settings" description="Manage Sender IDs, Integrations & Account" />
       <PageBreadcrumb pageTitle="Settings" />
+
+      {/* Alert Feedback */}
+      {alert && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-999999 animate-slide-down">
+          <Alert
+            variant={alert.variant}
+            title={alert.title}
+            message={alert.message}
+            showLink={false}
+          />
+        </div>
+      )}
 
       <div className="min-h-screen rounded-2xl border border-gray-200 bg-white px-5 py-7 dark:border-gray-800 dark:bg-white/3 xl:px-10 xl:py-12">
         <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-8">
@@ -361,6 +685,212 @@ export default function SettingsPage() {
                 </Button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ────────────────────── Payment Confirmation Modal ────────────────────── */}
+      {showPaymentModal && selectedSenderForPayment && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl dark:bg-gray-900">
+            <div className="mb-6">
+              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+                Change Sender ID
+              </h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Review the changes and payment details
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              {/* Sender Change Summary */}
+              <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg space-y-3">
+                <div className="flex justify-between">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Current Sender</span>
+                  <span className="font-semibold text-gray-900 dark:text-white">
+                    {senders.find(s => s.isActive)?.name || 'None'}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">New Sender</span>
+                  <span className="font-semibold text-gray-900 dark:text-white">
+                    {selectedSenderForPayment.name}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">New Rate</span>
+                  <span className="font-semibold text-gray-900 dark:text-white">
+                    {selectedSenderForPayment.priceUgx} UGX/SMS
+                  </span>
+                </div>
+                <div className="pt-3 border-t border-gray-200 dark:border-gray-700 flex justify-between">
+                  <span className="text-base font-semibold text-gray-900 dark:text-white">Payment Amount</span>
+                  <span className="text-xl font-bold text-primary">
+                    {calculatePaymentAmount().toLocaleString()} UGX
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  One-time setup fee based on 100 SMS
+                </p>
+              </div>
+
+              {/* Phone Number Display */}
+              <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                <div className="flex items-center gap-2 text-sm">
+                  <Phone className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                  {phoneNumber ? (
+                    <span className="text-gray-700 dark:text-gray-300">
+                      {identityName ? `${identityName} - ` : ''}{maskNumber(phoneNumber)}
+                    </span>
+                  ) : (
+                    <span className="text-gray-500 dark:text-gray-400">No phone number added</span>
+                  )}
+                  <button
+                    onClick={() => setShowNumberModal(true)}
+                    className="ml-auto text-blue-600 dark:text-blue-400 hover:underline text-xs"
+                  >
+                    {phoneNumber ? 'Change' : 'Add Number'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  onClick={resetPaymentModals}
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleInitiatePayment}
+                  disabled={!phoneNumber || isProcessingPayment}
+                  className="flex-1"
+                >
+                  {isProcessingPayment ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    'Pay & Change'
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ────────────────────── OTP Modal ────────────────────── */}
+      {showOTPModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl dark:bg-gray-900">
+            <div className="mb-6 flex items-center gap-3">
+              <div className="rounded-full bg-brand-100 p-2 dark:bg-brand-900/20">
+                <Shield className="h-5 w-5 text-brand-600 dark:text-brand-400" />
+              </div>
+              <div>
+                <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
+                  Approve Payment
+                </h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Check your phone {phoneNumber ? `(${maskNumber(phoneNumber)})` : ''} to approve the payment
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-5">
+              <div className="rounded-lg bg-blue-50 dark:bg-blue-900/20 p-4 text-center">
+                <Loader2 className="mx-auto h-12 w-12 animate-spin text-brand-600 dark:text-brand-400" />
+                <p className="mt-3 text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Waiting for payment approval...
+                </p>
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  This may take a few moments
+                </p>
+                {transactionUuid && (
+                  <p className="mt-2 text-xs text-gray-400 dark:text-gray-500 font-mono">
+                    Ref: {transactionUuid.slice(0, 8)}...
+                  </p>
+                )}
+              </div>
+
+              <div className="flex gap-3">
+                <Button variant="outline" onClick={resetPaymentModals} className="flex-1" disabled={isProcessingPayment}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ────────────────────── Add/Change Number Modal ────────────────────── */}
+      {showNumberModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl dark:bg-gray-900">
+            <div className="mb-6 flex items-center justify-between">
+              <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
+                {phoneNumber ? 'Change Phone Number' : 'Add Phone Number'}
+              </h3>
+              <button
+                onClick={() => setShowNumberModal(false)}
+                className="rounded-lg p-1 hover:bg-gray-100 dark:hover:bg-white/10"
+              >
+                <X className="h-5 w-5 text-gray-500" />
+              </button>
+            </div>
+
+            <div className="space-y-5">
+              <div>
+                <Label>Phone Number</Label>
+                <Input
+                  type="tel"
+                  placeholder="e.g. 256712345678"
+                  value={phoneNumber}
+                  onChange={(e) => {
+                    setPhoneNumber(e.target.value.replace(/[^\d+]/g, ''));
+                    setIdentityName('');
+                  }}
+                />
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Use your active number. Format: countrycode + number (e.g., 2567xxxxxxx)</p>
+                {identityName && (
+                  <p className="mt-2 text-sm text-green-600 dark:text-green-400 flex items-center gap-1">
+                    <CheckCircle className="h-4 w-4" />
+                    Account holder: {identityName}
+                  </p>
+                )}
+              </div>
+
+              <div className="flex gap-3">
+                <Button variant="outline" onClick={() => setShowNumberModal(false)} className="flex-1">
+                  Cancel
+                </Button>
+                <Button
+                  onClick={async () => {
+                    if (phoneNumber && phoneNumber.replace(/\D/g, '').length >= 9) {
+                      const isValid = await validatePhoneNumber(phoneNumber);
+                      if (isValid) {
+                        setShowNumberModal(false);
+                      }
+                    }
+                  }}
+                  disabled={!phoneNumber || phoneNumber.replace(/\D/g, '').length < 9 || isValidatingNumber}
+                  className="flex-1"
+                >
+                  {isValidatingNumber ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Validating...
+                    </>
+                  ) : (
+                    'Verify & Save'
+                  )}
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
       )}

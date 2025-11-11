@@ -469,7 +469,7 @@ export default function AutoTopUp() {
             </h3>
 
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {[50, 100, 200, 500].map((amt) => (
+              {[500, 1000, 2000, 5000].map((amt) => (
                 <button
                   key={amt}
                   onClick={() => {

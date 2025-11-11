@@ -1,20 +1,19 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
 import {
   BanknoteArrowUpIcon,
+  KeyRoundIcon,
   LayoutTemplate,
   MailIcon,
   MessageCircleMore,
   SquareActivity,
   SquareStack,
   StoreIcon,
-  UsersIcon,
   TicketPercentIcon,
-  KeyRoundIcon,
-  Ticket,
+  UsersIcon
 } from "lucide-react";
-import { useSidebar } from "../context/SidebarContext";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { useSidebar } from "../context/SidebarContext";
 import { ChevronDownIcon, PlugInIcon } from "../icons";
 import SidebarWidget from "./SidebarWidget";
 
@@ -87,12 +86,13 @@ const developerItems: NavItem[] = [
     name: "Developer API",
     icon: <KeyRoundIcon />,
     path: "/developer/api-keys",
-  },
-  {
-    name: "Subscriptions",
-    icon: <Ticket />,
-    path: "/subscriptions",
-  },
+  }
+  // ,
+  // {
+  //   name: "Subscriptions",
+  //   icon: <Ticket />,
+  //   path: "/subscriptions",
+  // },
 ];
 
 const adminItems: NavItem[] = [
