@@ -73,8 +73,8 @@ export default function EcommerceMetrics() {
   const totalEnqueued = smsHistory.filter(
     (sms) => sms.status === 'pending' || sms.delivery_status === 'pending'
   ).length;
-  const currentPlan = userProfile?.plan || 'Free';
-  const availablePlans = ['Free', 'Basic', 'Pro', 'Enterprise'];
+  const currentPlan = userProfile?.plan ;
+  const availablePlans = ['Basic', 'Standard', 'Premium', 'Enterprise'];
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 md:gap-6">
       {/* <!-- Metric Item Start --> */}
@@ -128,9 +128,6 @@ export default function EcommerceMetrics() {
         </div>
         <div className="flex items-end justify-between mt-5">
           <div>
-            <span className="text-sm text-gray-500 dark:text-gray-400">
-              Current Plan
-            </span>
             <h4 className="mt-2 font-bold text-gray-800 text-title-xs dark:text-white/90">
               {currentPlan}
             </h4>

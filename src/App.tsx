@@ -1,31 +1,32 @@
 import { Route, BrowserRouter as Router, Routes } from "react-router-dom";
-import ProtectedRoute from "./components/auth/ProtectedRoute";
 import AdminRoute from "./components/auth/AdminRoute";
+import ProtectedRoute from "./components/auth/ProtectedRoute";
 import { ScrollToTop } from "./components/common/ScrollToTop";
 import AppLayout from "./layout/AppLayout";
-import SignIn from "./pages/AuthPages/SignIn";
-import SignUp from "./pages/AuthPages/SignUp";
+import PromoCodeManagementPage from "./pages/Admin/PromoCodeManagement";
+import UserManagementPage from "./pages/Admin/UserManagement";
 import ForgotPasswordPage from "./pages/AuthPages/ForgotPassword";
 import ResetPasswordPage from "./pages/AuthPages/ResetPasswordPage";
+import SignIn from "./pages/AuthPages/SignIn";
+import SignUp from "./pages/AuthPages/SignUp";
 import ContactGroups from "./pages/Contacts/ContactGroups";
 import ComposePage from "./pages/Dashboard/Compose";
 import Home from "./pages/Dashboard/Home";
+import ApiKeysPage from "./pages/Developer/ApiKeysPage";
 import AutoTopUp from "./pages/Extension/Autotopup";
 import Developer from "./pages/Extension/Developers";
 import TicketsPage from "./pages/Extension/Tickets";
+import ActivityLogs from "./pages/Logs/ActivityLogs";
 import NotFound from "./pages/NoRoute/NotFound";
+import Notifications from "./pages/Notifications/Notifications";
+import Subscribptions from "./pages/Packages/Subscribptions";
+import ProfilePage from "./pages/Profile/Profile";
 import Transactions from "./pages/Recents/Billings";
 import RecentHistory from "./pages/Recents/RecentHistory";
+import SettingsPage from "./pages/Settings/SettingsPage";
 import ListTemplates from "./pages/Template/ListTemplates";
 import Tage from "./pages/Template/Tage";
-import WapMessage from "./pages/Message/WapMessage";
-import ProfilePage from "./pages/Profile/Profile";
-import UserManagementPage from "./pages/Admin/UserManagement";
-import PromoCodeManagementPage from "./pages/Admin/PromoCodeManagement";
-import ApiKeysPage from "./pages/Developer/ApiKeysPage";
-import SettingsPage from "./pages/Settings/SettingsPage";
-import ActivityLogs from "./pages/Logs/ActivityLogs";
-import Notifications from "./pages/Notifications/Notifications";
+import Whatsapp from "./pages/UnderDev/Whatsapp";
 
 export default function App() {
   return (
@@ -48,11 +49,12 @@ export default function App() {
               <Route path="/autotopup" element={<AutoTopUp />} />
               <Route path="/contacts" element={<ContactGroups />} />
               <Route path="/history" element={<RecentHistory />} />
-              <Route path="/whatsappmsg" element={<WapMessage />} />
+              <Route path="/whatsappmsg" element={<Whatsapp />} />
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/logs" element={<ActivityLogs />} />
               <Route path="/notifications" element={<Notifications />} />
               <Route path="/developer/api-keys" element={<ApiKeysPage />} />
+              <Route path="/subscriptions" element={<Subscribptions />} />
             </Route>
           </Route>
 

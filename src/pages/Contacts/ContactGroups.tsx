@@ -7,7 +7,7 @@ import Label from "../../components/form/Label";
 import Input from '../../components/form/input/InputField';
 import Button from "../../components/ui/button/Button";
 import { apiClient } from "../../lib/api/client";
-import type { ContactCreate, ContactGroupsPublic, ContactsPublic } from "../../lib/api";
+import type { ContactCreate, ContactGroupsPublic, ContactsPublic, ContactGroupUpdate, ContactUpdate } from "../../lib/api";
 import { useMutation, useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import Skeleton from "../../components/ui/Skeleton";
 import useCustomToast from "../../hooks/useCustomToast";
@@ -54,6 +54,12 @@ export default function ContactGroups() {
   const [groupContacts, setGroupContacts] = useState<Contact[]>([]);
   const [groupContactsCount, setGroupContactsCount] = useState(0);
   const [deletingGroupId, setDeletingGroupId] = useState<string | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingGroup, setEditingGroup] = useState<Group | null>(null);
+  const [editGroupName, setEditGroupName] = useState('');
+  const [editingContact, setEditingContact] = useState<Contact | null>(null);
+  const [editContactData, setEditContactData] = useState({ name: '', phone: '', email: '' });
+  const [deletingContactId, setDeletingContactId] = useState<string | null>(null);
 
   const itemsPerPage = 8;
   const contactsPerPage = 5;
@@ -79,6 +85,37 @@ export default function ContactGroups() {
       queryClient.invalidateQueries({ queryKey: ['contactGroups'] });
     },
     onError: () => showErrorToast('Failed to delete group'),
+  });
+
+  const updateGroupMutation = useMutation({
+    mutationFn: async ({ groupId, update }: { groupId: string; update: ContactGroupUpdate }) =>
+      apiClient.api.contacts.contactsUpdateContactGroup({ groupId, contactGroupUpdate: update }),
+    onSuccess: () => {
+      showSuccessToast('Group updated successfully');
+      queryClient.invalidateQueries({ queryKey: ['contactGroups'] });
+    },
+    onError: () => showErrorToast('Failed to update group'),
+  });
+
+  const deleteContactMutation = useMutation({
+    mutationFn: async (contactId: string) =>
+      apiClient.api.contacts.contactsDeleteContact({ contactId }),
+    onSuccess: () => {
+      showSuccessToast('Contact deleted');
+      queryClient.invalidateQueries({ queryKey: ['contactGroups'] });
+      queryClient.invalidateQueries({ queryKey: ['groupContacts'] });
+    },
+    onError: () => showErrorToast('Failed to delete contact'),
+  });
+
+  const updateContactMutation = useMutation({
+    mutationFn: async ({ contactId, update }: { contactId: string; update: ContactUpdate }) =>
+      apiClient.api.contacts.contactsUpdateContact({ contactId, contactUpdate: update }),
+    onSuccess: () => {
+      showSuccessToast('Contact updated');
+      queryClient.invalidateQueries({ queryKey: ['groupContacts'] });
+    },
+    onError: () => showErrorToast('Failed to update contact'),
   });
 
   useEffect(() => {
@@ -311,7 +348,12 @@ export default function ContactGroups() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={(e) => { e.stopPropagation(); /* Edit */ }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setEditingGroup(group);
+                    setEditGroupName(group.name);
+                    setIsEditModalOpen(true);
+                  }}
                   startIcon={<Edit2 className="w-4 h-4" />}
                 >
                   Edit
@@ -410,6 +452,7 @@ export default function ContactGroups() {
                         <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Name</th>
                         <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Phone</th>
                         <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Email</th>
+                        <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 dark:divide-white/5">
@@ -419,6 +462,7 @@ export default function ContactGroups() {
                             <td className="px-4 py-2"><Skeleton className="h-4 w-40" /></td>
                             <td className="px-4 py-2"><Skeleton className="h-4 w-32" /></td>
                             <td className="px-4 py-2"><Skeleton className="h-4 w-52" /></td>
+                            <td className="px-4 py-2"><Skeleton className="h-4 w-20" /></td>
                           </tr>
                         ))
                       ) : (
@@ -427,6 +471,41 @@ export default function ContactGroups() {
                             <td className="px-4 py-2 text-sm text-gray-900 dark:text-white">{contact.name}</td>
                             <td className="px-4 py-2 text-sm text-gray-900 dark:text-white">{contact.phone}</td>
                             <td className="px-4 py-2 text-sm text-gray-900 dark:text-white">{contact.email || '-'}</td>
+                            <td className="px-4 py-2">
+                              <div className="flex gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    setEditingContact(contact);
+                                    setEditContactData({ name: contact.name, phone: contact.phone, email: contact.email || '' });
+                                  }}
+                                  startIcon={<Edit2 className="w-3 h-3" />}
+                                >
+                                  Edit
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  isLoading={deletingContactId === contact.id && deleteContactMutation.isPending}
+                                  onClick={async () => {
+                                    if (confirm(`Delete ${contact.name}?`)) {
+                                      try {
+                                        setDeletingContactId(contact.id);
+                                        await deleteContactMutation.mutateAsync(contact.id);
+                                        setDeletingContactId(null);
+                                      } catch (err) {
+                                        setDeletingContactId(null);
+                                        console.error('Failed to delete contact', err);
+                                      }
+                                    }
+                                  }}
+                                  startIcon={<Trash2 className="w-3 h-3" />}
+                                >
+                                  Delete
+                                </Button>
+                              </div>
+                            </td>
                           </tr>
                         ))
                       )}
@@ -508,6 +587,132 @@ export default function ContactGroups() {
                   isLoading={createGroupMutation.isPending}
                 >
                   Create Group
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Group Modal */}
+        {isEditModalOpen && editingGroup && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl max-w-md w-full p-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Edit Group</h3>
+              <Label>Group Name</Label>
+              <Input
+                placeholder="Group name"
+                value={editGroupName}
+                onChange={(e) => setEditGroupName(e.target.value)}
+                className="mt-1"
+              />
+              <div className="flex justify-end gap-3 mt-6">
+                <Button
+                  variant="outline"
+                  size="md"
+                  onClick={() => {
+                    setIsEditModalOpen(false);
+                    setEditingGroup(null);
+                    setEditGroupName('');
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="primary"
+                  size="md"
+                  onClick={async () => {
+                    if (!editGroupName.trim()) return;
+                    try {
+                      await updateGroupMutation.mutateAsync({
+                        groupId: editingGroup.id,
+                        update: { name: editGroupName },
+                      });
+                      setIsEditModalOpen(false);
+                      setEditingGroup(null);
+                      setEditGroupName('');
+                    } catch (err) {
+                      console.error('Failed to update group', err);
+                    }
+                  }}
+                  disabled={!editGroupName.trim()}
+                  isLoading={updateGroupMutation.isPending}
+                >
+                  Save Changes
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Contact Modal */}
+        {editingContact && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl max-w-md w-full p-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Edit Contact</h3>
+              <div className="space-y-4">
+                <div>
+                  <Label>Name *</Label>
+                  <Input
+                    placeholder="Name"
+                    value={editContactData.name}
+                    onChange={(e) => setEditContactData(prev => ({ ...prev, name: e.target.value }))}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label>Phone *</Label>
+                  <Input
+                    placeholder="Phone"
+                    value={editContactData.phone}
+                    onChange={(e) => setEditContactData(prev => ({ ...prev, phone: e.target.value }))}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label>Email (optional)</Label>
+                  <Input
+                    placeholder="Email"
+                    value={editContactData.email}
+                    onChange={(e) => setEditContactData(prev => ({ ...prev, email: e.target.value }))}
+                    className="mt-1"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end gap-3 mt-6">
+                <Button
+                  variant="outline"
+                  size="md"
+                  onClick={() => {
+                    setEditingContact(null);
+                    setEditContactData({ name: '', phone: '', email: '' });
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="primary"
+                  size="md"
+                  onClick={async () => {
+                    if (!editContactData.name.trim() || !editContactData.phone.trim()) return;
+                    try {
+                      await updateContactMutation.mutateAsync({
+                        contactId: editingContact.id,
+                        update: {
+                          name: editContactData.name,
+                          phone: editContactData.phone,
+                          email: editContactData.email || undefined,
+                        },
+                      });
+                      setEditingContact(null);
+                      setEditContactData({ name: '', phone: '', email: '' });
+                    } catch (err) {
+                      console.error('Failed to update contact', err);
+                    }
+                  }}
+                  disabled={!editContactData.name.trim() || !editContactData.phone.trim()}
+                  isLoading={updateContactMutation.isPending}
+                >
+                  Save Changes
                 </Button>
               </div>
             </div>

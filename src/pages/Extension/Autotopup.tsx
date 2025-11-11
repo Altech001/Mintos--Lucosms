@@ -11,19 +11,33 @@ import Button from "../../components/ui/button/Button";
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from "../../lib/api/client";
 import type { AddFundsRequest, WalletResponse } from "../../lib/api";
+import { useAuth } from '../../context/AuthContext';
 
 type Tab = 'topup' | 'history';
 
 interface Transaction {
   id: string;
+  transaction_type: string;
   amount: number;
-  status: 'success' | 'pending' | 'failed';
-  date: string;
-  type: 'topup';
-  method?: string;
+  currency: string;
+  description: string;
+  status: 'completed' | 'pending' | 'failed';
+  payment_method: string;
+  reference_number: string;
+  created_at: string;
+  updated_at: string;
+  user_id: string;
+  balance_before: number | null;
+  balance_after: number | null;
+}
+
+interface TransactionsResponse {
+  data: Transaction[];
+  count: number;
 }
 
 export default function AutoTopUp() {
+  const { user, apiClient: authApiClient } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>('topup');
   const [showTopUpModal, setShowTopUpModal] = useState(false);
   const [showOTPModal, setShowOTPModal] = useState(false);
@@ -54,12 +68,34 @@ export default function AutoTopUp() {
     },
   });
 
-  // Mock history
-  const [history, setHistory] = useState<Transaction[]>([
-    { id: 'TXN001', amount: 500, status: 'success', date: 'Oct 31, 2025', type: 'topup', method: 'Card' },
-    { id: 'TXN002', amount: 200, status: 'pending', date: 'Oct 30, 2025', type: 'topup', method: 'UPI' },
-    { id: 'TXN003', amount: 1000, status: 'failed', date: 'Oct 28, 2025', type: 'topup', method: 'Card' },
-  ]);
+  // Fetch real transactions from API
+  const fetchTransactions = async (): Promise<Transaction[]> => {
+    const token = authApiClient.getToken();
+    if (!token) return [];
+
+    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+    const endpoint = `${baseUrl}/api/v1/transactions/?skip=0&limit=10`;
+
+    const response = await fetch(endpoint, {
+      headers: {
+        'accept': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch transactions');
+    }
+
+    const result: TransactionsResponse = await response.json();
+    return result.data;
+  };
+
+  const { data: transactions = [], isLoading: isTxLoading } = useQuery({
+    queryKey: ['transactions', user?.id],
+    queryFn: fetchTransactions,
+    staleTime: 60_000,
+  });
 
   const handleInitiateTopUp = () => {
     const amount = parseFloat(topUpAmount);
@@ -78,29 +114,22 @@ export default function AutoTopUp() {
     setTimeout(() => setIsProcessing(false), 1200);
   };
 
-  const handleVerifyOTP = () => {
+  const handleVerifyOTP = async () => {
     if (otp.length !== 6) return;
     setIsProcessing(true);
 
-    setTimeout(() => {
+    setTimeout(async () => {
       const success = Math.random() > 0.25; // 75% success
       if (success) {
         const amount = parseFloat(topUpAmount);
         // Simulate successful payment then persist via API
-        void addFundsMutation.mutateAsync({
+        await addFundsMutation.mutateAsync({
           amount,
           paymentMethod: 'Card',
           referenceNumber: 'TOPUP-' + Date.now(),
         });
-        const newTx: Transaction = {
-          id: 'TXN' + Date.now(),
-          amount,
-          status: 'success',
-          date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-          type: 'topup',
-          method: 'Card'
-        };
-        setHistory(prev => [newTx, ...prev]);
+        // Invalidate transactions query to refetch
+        await queryClient.invalidateQueries({ queryKey: ['transactions'] });
         setAlert({ variant: 'success', title: 'Top-Up Successful!', message: `UGx ${amount.toFixed(2)} added to your balance.` });
       } else {
         setAlert({ variant: 'error', title: 'Top-Up Failed', message: 'Invalid OTP or payment declined. Please try again.' });
@@ -253,17 +282,21 @@ export default function AutoTopUp() {
           </div>
         ) : (
           <div className="space-y-4">
-            {history.length === 0 ? (
+            {isTxLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-brand-600" />
+              </div>
+            ) : transactions.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-12 text-center dark:border-gray-700 dark:bg-white/5">
                 <Clock className="mx-auto h-12 w-12 text-gray-400" />
                 <p className="mt-3 text-gray-500 dark:text-gray-400">No transaction history yet.</p>
               </div>
             ) : (
-              history.map((tx, i) => (
+              transactions.map((tx, i) => (
                 <div
                   key={tx.id}
                   className={`flex items-center justify-between rounded-xl border p-4 transition-all ${
-                    tx.status === 'success'
+                    tx.status === 'completed'
                       ? 'border-green-200 bg-green-50/50 dark:border-green-900/30 dark:bg-green-900/10'
                       : tx.status === 'pending'
                       ? 'border-yellow-200 bg-yellow-50/50 dark:border-yellow-900/30 dark:bg-yellow-900/10'
@@ -273,25 +306,28 @@ export default function AutoTopUp() {
                 >
                   <div className="flex items-center gap-3">
                     <div className={`rounded-full p-2 ${
-                      tx.status === 'success' ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400' :
+                      tx.status === 'completed' ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400' :
                       tx.status === 'pending' ? 'bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400' :
                       'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'
                     }`}>
-                      {tx.status === 'success' ? <CheckCircle className="h-5 w-5" /> :
+                      {tx.status === 'completed' ? <CheckCircle className="h-5 w-5" /> :
                        tx.status === 'pending' ? <Clock className="h-5 w-5" /> :
                        <XCircle className="h-5 w-5" />}
                     </div>
                     <div>
                       <p className="font-semibold text-gray-900 dark:text-white">
-                        +${tx.amount.toFixed(2)}
+                        {tx.transaction_type === 'credit' ? '+' : '-'}{tx.currency} {tx.amount.toFixed(2)}
                       </p>
                       <p className="text-xs text-gray-500 dark:text-gray-400">
-                        {tx.method} • {tx.date}
+                        {tx.payment_method} • {new Date(tx.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      </p>
+                      <p className="text-xs text-gray-600 dark:text-gray-500 mt-0.5">
+                        {tx.description}
                       </p>
                     </div>
                   </div>
                   <span className={`rounded-full px-3 py-1 text-xs font-medium ${
-                    tx.status === 'success' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' :
+                    tx.status === 'completed' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' :
                     tx.status === 'pending' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300' :
                     'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
                   }`}>

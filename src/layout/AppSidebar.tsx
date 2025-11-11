@@ -1,12 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { BanknoteArrowUpIcon, LayoutTemplate, MailIcon, MessageCircleMore, SquareActivity, SquareStack, StoreIcon, UsersIcon, TicketPercentIcon, KeyRoundIcon } from "lucide-react";
+import {
+  BanknoteArrowUpIcon,
+  LayoutTemplate,
+  MailIcon,
+  MessageCircleMore,
+  SquareActivity,
+  SquareStack,
+  StoreIcon,
+  UsersIcon,
+  TicketPercentIcon,
+  KeyRoundIcon,
+  Ticket,
+} from "lucide-react";
 import { useSidebar } from "../context/SidebarContext";
 import { useAuth } from "../context/AuthContext";
-import {
-  ChevronDownIcon,
-  PlugInIcon
-} from "../icons";
+import { ChevronDownIcon, PlugInIcon } from "../icons";
 import SidebarWidget from "./SidebarWidget";
 
 type NavItem = {
@@ -15,6 +24,8 @@ type NavItem = {
   path?: string;
   subItems?: { name: string; path: string; pro?: boolean; new?: boolean }[];
 };
+
+
 
 const navItems: NavItem[] = [
   {
@@ -46,7 +57,7 @@ const navItems: NavItem[] = [
     path: "/billings",
   },
   {
-    name: "Auto Top Up",
+    name: "Auto TopUp",
     icon: <BanknoteArrowUpIcon />,
     path: "/autotopup",
   },
@@ -56,7 +67,7 @@ const othersItems: NavItem[] = [
   {
     icon: <PlugInIcon />,
     name: "Extensions",
-    
+
     subItems: [
       { name: "Settings", path: "/settings", pro: false },
       { name: "Contacts Folder", path: "/contacts", pro: false, new: true },
@@ -64,7 +75,7 @@ const othersItems: NavItem[] = [
       { name: "Developer", path: "/developers", pro: false },
     ],
   },
-    {
+  {
     name: "WhatsApp Message",
     icon: <MessageCircleMore />,
     path: "/whatsappmsg",
@@ -76,6 +87,11 @@ const developerItems: NavItem[] = [
     name: "Developer API",
     icon: <KeyRoundIcon />,
     path: "/developer/api-keys",
+  },
+  {
+    name: "Subscriptions",
+    icon: <Ticket />,
+    path: "/subscriptions",
   },
 ];
 
@@ -97,6 +113,13 @@ const AppSidebar: React.FC = () => {
   const { user } = useAuth();
   const location = useLocation();
 
+  // Generate avatar URL based on user email or name
+  const getAvatarUrl = () => {
+    const seed = user?.email || user?.fullName || 'default';
+    // Using DiceBear API for avatars - multiple styles available
+    return `https://api.dicebear.com/7.x/micah/svg?seed=${encodeURIComponent(seed)}&backgroundColor=3b82f6,8b5cf6,ec4899,f59e0b,10b981`;
+  };
+
   const [openSubmenu, setOpenSubmenu] = useState<{
     type: "main" | "others" | "admin" | "developer";
     index: number;
@@ -114,7 +137,10 @@ const AppSidebar: React.FC = () => {
 
   useEffect(() => {
     let submenuMatched = false;
-    const allMenus: { type: "main" | "others" | "admin" | "developer"; items: NavItem[] }[] = [
+    const allMenus: {
+      type: "main" | "others" | "admin" | "developer";
+      items: NavItem[];
+    }[] = [
       { type: "main", items: navItems },
       { type: "others", items: othersItems },
       { type: "developer", items: developerItems },
@@ -153,7 +179,10 @@ const AppSidebar: React.FC = () => {
     }
   }, [openSubmenu]);
 
-  const handleSubmenuToggle = (index: number, menuType: "main" | "others" | "admin" | "developer") => {
+  const handleSubmenuToggle = (
+    index: number,
+    menuType: "main" | "others" | "admin" | "developer"
+  ) => {
     setOpenSubmenu((prevOpenSubmenu) => {
       if (
         prevOpenSubmenu &&
@@ -166,7 +195,10 @@ const AppSidebar: React.FC = () => {
     });
   };
 
-  const renderMenuItems = (items: NavItem[], menuType: "main" | "others" | "admin" | "developer") => (
+  const renderMenuItems = (
+    items: NavItem[],
+    menuType: "main" | "others" | "admin" | "developer"
+  ) => (
     <ul className="flex flex-col gap-4.5">
       {items.map((nav, index) => (
         <li key={nav.name}>
@@ -305,38 +337,30 @@ const AppSidebar: React.FC = () => {
       onMouseLeave={() => setIsHovered(false)}
     >
       <div
-        className={`py-8 flex ${
+        className={`py-8 flex flex-col items-center ${
           !isExpanded && !isHovered ? "lg:justify-center" : "justify-center"
         }`}
       >
-        <Link to="/">
-          {isExpanded || isHovered || isMobileOpen ? (
-            <>
-              <img
-                className="dark:hidden"
-                src="/images/logo/luco.png"
-                alt="Logo"
-                width={30}
-                height={30}
-                style={{objectFit: "contain"}}
-              />
-              <img
-                className="hidden dark:block"
-                src="/images/logo/luco.png"
-                alt="Logo"
-                width={30}
-                height={30}
-                style={{objectFit: "contain"}}
-                />
-            </>
-          ) : (
+        <Link to="/" className="flex flex-col items-center gap-3">
+          {/* Circular Avatar */}
+          <div className={`${isExpanded || isHovered || isMobileOpen ? "w-20 h-20" : "w-12 h-12"} rounded-full overflow-hidden border-4 border-primary shadow-lg transition-all duration-300`}>
             <img
-              src="/images/logo/luco.png"
-              alt="Logo"
-              width={30}
-              height={30}
-              style={{objectFit: "contain"}}
-              />
+              src={getAvatarUrl()}
+              alt={user?.fullName || user?.email || "User"}
+              className="w-full h-full object-cover"
+            />
+          </div>
+          
+          {/* LUCOSMS Text - Only show when expanded */}
+          {(isExpanded || isHovered || isMobileOpen) && (
+            <div className="text-center">
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white tracking-wide">
+                LUCOSMS
+              </h3>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                {user?.fullName || user?.email || "User"}
+              </p>
+            </div>
           )}
         </Link>
       </div>
@@ -350,8 +374,7 @@ const AppSidebar: React.FC = () => {
                     ? "lg:justify-center"
                     : "justify-start"
                 }`}
-              >
-              </h2>
+              ></h2>
               {renderMenuItems(navItems, "main")}
             </div>
             <div className="">
@@ -361,8 +384,7 @@ const AppSidebar: React.FC = () => {
                     ? "lg:justify-center"
                     : "justify-start"
                 }`}
-              >
-              </h2>
+              ></h2>
               {renderMenuItems(othersItems, "others")}
             </div>
             <div className="mt-6">
