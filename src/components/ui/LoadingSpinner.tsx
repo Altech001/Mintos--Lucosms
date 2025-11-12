@@ -28,7 +28,7 @@ export default function LoadingSpinner({
 
   if (fullScreen) {
     return (
-      <div className="fixed inset-0 flex items-center justify-center bg-white dark:bg-gray-950 z-50">
+      <div className="fixed inset-0 flex items-center justify-center bg-transparent backdrop-blur-sm dark:bg-gray-950 z-50">
         {content}
       </div>
     );

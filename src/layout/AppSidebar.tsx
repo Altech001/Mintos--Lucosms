@@ -4,6 +4,7 @@ import {
   LayoutTemplate,
   MailIcon,
   MessageCircleMore,
+  ServerIcon,
   SquareActivity,
   SquareStack,
   StoreIcon,
@@ -105,6 +106,11 @@ const adminItems: NavItem[] = [
     name: "Promo Codes",
     icon: <TicketPercentIcon />,
     path: "/admin/promo-codes",
+  },
+  {
+    name: "Services",
+    icon: <ServerIcon />,
+    path: "/admin/services",
   },
 ];
 

@@ -1,14 +1,24 @@
-import { useEffect, useState, useCallback } from "react";
-import { useAuth } from "../../context/AuthContext";
-import { UserPublic, UserCreate, UserUpdate } from "../../lib/api/models";
+import { useCallback, useEffect, useState } from "react";
+import Input from "../../components/form/input/InputField";
+import Select from "../../components/form/Select";
 import Button from "../../components/ui/button/Button";
 import Modal from "../../components/ui/modal/Modal";
-import UserForm from "./UserForm";
 import Pagination from "../../components/ui/Pagination";
-import Input from "../../components/form/input/InputField";
 import Skeleton from "../../components/ui/Skeleton";
+import { useAuth } from "../../context/AuthContext";
+import { UserCreate, UserPublic, UserUpdate } from "../../lib/api/models";
 import FundsModal from "./modals/FundsModal";
 import PlanModal from "./modals/PlanModal";
+import UserForm from "./UserForm";
+import ComponentCard from "../../components/common/ComponentCard";
+
+// API Base URL
+const API_BASE_URL = 'http://localhost:8000/api/v1';
+
+// Get token from localStorage or context
+const getAuthToken = () => {
+  return localStorage.getItem('authToken') ;
+};
 
 export default function UserManagementPage() {
   const { apiClient, user } = useAuth();
@@ -89,7 +99,24 @@ export default function UserManagementPage() {
     if (!selectedUser) return;
     setIsMutating(selectedUser.id);
     try {
-      await apiClient.api.userData.adminAddFundsToWallet({ userId: selectedUser.id, addFundsRequest: { amount, } });
+      const response = await fetch(`${API_BASE_URL}/admin/users/${selectedUser.id}/add-balance`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${getAuthToken()}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          user_id: selectedUser.id,
+          amount,
+          description: 'Admin funds adjustment',
+          payment_method: 'admin_adjustment'
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to add funds');
+      }
+
       fetchUsers();
       setIsFundsModalOpen(false);
     } catch (err) {
@@ -103,7 +130,24 @@ export default function UserManagementPage() {
     if (!selectedUser) return;
     setIsMutating(selectedUser.id);
     try {
-      await apiClient.api.userData.adminDeductFundsFromWallet({ userId: selectedUser.id, deductFundsRequest: { amount, reason } });
+      const response = await fetch(`${API_BASE_URL}/admin/users/${selectedUser.id}/deduct-balance`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${getAuthToken()}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          user_id: selectedUser.id,
+          amount,
+          reason,
+          payment_method: 'admin_deduction'
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to deduct funds');
+      }
+
       fetchUsers();
       setIsFundsModalOpen(false);
     } catch (err) {
@@ -117,7 +161,22 @@ export default function UserManagementPage() {
     if (!selectedUser) return;
     setIsMutating(selectedUser.id);
     try {
-      await apiClient.api.userData.adminChangePlan({ userId: selectedUser.id, changePlanRequest: { newPlan } });
+      const response = await fetch(`${API_BASE_URL}/admin/users/${selectedUser.id}/change-plan`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${getAuthToken()}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          user_id: selectedUser.id,
+          new_plan: newPlan
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to change plan');
+      }
+
       fetchUsers();
       setIsPlanModalOpen(false);
     } catch (err) {
@@ -150,30 +209,33 @@ export default function UserManagementPage() {
   }
 
   return (
+
     <div className="p-4 sm:p-6">
+      <ComponentCard title="User Management" desc="Manage users and other activities">
       <div className="flex flex-col gap-4 mb-6 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-2xl font-semibold text-gray-800 dark:text-white">User Management</h1>
+        <div></div>
         <div className="flex flex-wrap items-center gap-4">
           <Input 
             type="text"
             placeholder="Search by name or email..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full sm:w-auto"
+            className="w-full sm:w-auto appearance-none "
           />
-          <select 
+          <Select 
             value={statusFilter} 
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="w-full bg-white border border-gray-300 rounded-md shadow-sm sm:w-auto focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-          >
-            <option value="all">All Statuses</option>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-          </select>
+            onChange={(value) => setStatusFilter(value)}
+            options={[
+              { value: "all", label: "All Statuses" },
+              { value: "active", label: "Active" },
+              { value: "inactive", label: "Inactive" }
+            ]}
+            className="w-full border border-gray-300 rounded-md shadow-sm sm:w-auto focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+          />
           <select 
             value={roleFilter} 
             onChange={(e) => setRoleFilter(e.target.value)}
-            className="w-full bg-white border border-gray-300 rounded-md shadow-sm sm:w-auto focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+            className=" appearance-none rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 pr-11 text-sm shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
           >
             <option value="all">All Roles</option>
             <option value="admin">Admin</option>
@@ -182,10 +244,11 @@ export default function UserManagementPage() {
           <Button size="sm" onClick={() => { setEditingUser(null); setIsModalOpen(true); }}>Add User</Button>
         </div>
       </div>
+      
 
       {error && <div className="p-4 mb-4 text-sm text-red-700 bg-red-100 rounded-lg dark:bg-red-200 dark:text-red-800">{error}</div>}
 
-      <div className="overflow-x-auto bg-white rounded-lg shadow-md dark:bg-gray-800">
+      <div className="overflow-x-auto bg-white rounded-lg dark:bg-gray-800">
         <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
           <thead className="bg-gray-50 dark:bg-gray-700">
             <tr>
@@ -272,6 +335,7 @@ export default function UserManagementPage() {
           </Modal>
         </>
       )}
+      </ComponentCard>
     </div>
   );
 }

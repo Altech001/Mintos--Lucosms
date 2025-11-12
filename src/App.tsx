@@ -26,6 +26,7 @@ import SettingsPage from "./pages/Settings/SettingsPage";
 import ListTemplates from "./pages/Template/ListTemplates";
 import Tage from "./pages/Template/Tage";
 import Whatsapp from "./pages/UnderDev/Whatsapp";
+import UserServices from "./pages/Admin/UserServices";
 
 export default function App() {
   return (
@@ -62,6 +63,7 @@ export default function App() {
             <Route element={<AppLayout />}>
               <Route path="/admin/users" element={<UserManagementPage />} />
               <Route path="/admin/promo-codes" element={<PromoCodeManagementPage />} />
+              <Route path="/admin/services" element={<UserServices />} />
             </Route>
           </Route>
 
