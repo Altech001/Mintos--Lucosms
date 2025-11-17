@@ -27,7 +27,7 @@ const fetchUsers = async (filters: SearchFilters) => {
   params.append('skip', filters.skip.toString());
   params.append('limit', filters.limit.toString());
 
-  const response = await fetch(`${API_BASE_URL}/admin/users/search?${params}`, {
+  const response = await fetch(`${API_BASE_URL}/api/v1/admin/users/search?${params}`, {
     headers: {
       'Authorization': `Bearer ${getAuthToken()}`,
       'Content-Type': 'application/json',
@@ -42,7 +42,7 @@ const fetchUsers = async (filters: SearchFilters) => {
 };
 
 const fetchSystemStats = async () => {
-  const response = await fetch(`${API_BASE_URL}/admin/system/stats`, {
+  const response = await fetch(`${API_BASE_URL}/api/v1/admin/system/stats`, {
     headers: {
       'Authorization': `Bearer ${getAuthToken()}`,
       'Content-Type': 'application/json',
@@ -57,7 +57,7 @@ const fetchSystemStats = async () => {
 };
 
 const fetchSMSAnalytics = async (days: number = 30) => {
-  const response = await fetch(`${API_BASE_URL}/admin/analytics/sms-overview?days=${days}`, {
+  const response = await fetch(`${API_BASE_URL}/api/v1/admin/analytics/sms-overview?days=${days}`, {
     headers: {
       'Authorization': `Bearer ${getAuthToken()}`,
       'Content-Type': 'application/json',
@@ -72,7 +72,7 @@ const fetchSMSAnalytics = async (days: number = 30) => {
 };
 
 const addUserBalance = async ({ userId, amount, description }: { userId: string; amount: number; description: string }) => {
-  const response = await fetch(`${API_BASE_URL}/admin/users/${userId}/add-balance`, {
+  const response = await fetch(`${API_BASE_URL}/api/v1/admin/users/${userId}/add-balance`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${getAuthToken()}`,
@@ -95,7 +95,7 @@ const addUserBalance = async ({ userId, amount, description }: { userId: string;
 
 const toggleUserStatus = async ({ userId, activate }: { userId: string; activate: boolean }) => {
   const endpoint = activate ? 'activate' : 'deactivate';
-  const response = await fetch(`${API_BASE_URL}/admin/users/${userId}/${endpoint}`, {
+  const response = await fetch(`${API_BASE_URL}/api/v1/admin/users/${userId}/${endpoint}`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${getAuthToken()}`,
@@ -111,7 +111,7 @@ const toggleUserStatus = async ({ userId, activate }: { userId: string; activate
 };
 
 const bulkUpdateUserPlan = async ({ userIds, newPlan }: { userIds: string[]; newPlan: string }) => {
-  const response = await fetch(`${API_BASE_URL}/admin/users/bulk-update-plan?new_plan=${newPlan}`, {
+  const response = await fetch(`${API_BASE_URL}/api/v1/admin/users/bulk-update-plan?new_plan=${newPlan}`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${getAuthToken()}`,
