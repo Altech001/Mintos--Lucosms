@@ -10,7 +10,7 @@ import Button from '../../components/ui/button/Button';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 
 // API Base URL
-const API_BASE_URL = 'https://lucomintos.onrender.com/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_URL;
 
 // Get token from localStorage or context
 const getAuthToken = () => {
