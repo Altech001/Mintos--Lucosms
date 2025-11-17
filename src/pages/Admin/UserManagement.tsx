@@ -13,11 +13,11 @@ import UserForm from "./UserForm";
 import ComponentCard from "../../components/common/ComponentCard";
 
 // API Base URL
-const API_BASE_URL = 'https://lucomintos.onrender.com';
+const API_BASE_URL = 'https://lucomintos.onrender.com/api/v1';
 
 // Get token from localStorage or context
 const getAuthToken = () => {
-  return localStorage.getItem('authToken') ;
+  return localStorage.getItem('access_token') ;
 };
 
 export default function UserManagementPage() {

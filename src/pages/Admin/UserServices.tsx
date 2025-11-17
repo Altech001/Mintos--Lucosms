@@ -15,7 +15,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL;
 // Get token from localStorage or context
 const getAuthToken = () => {
   // Replace with your actual token management
-  return localStorage.getItem('authToken');
+  return localStorage.getItem('access_token');
 };
 
 // API Functions
