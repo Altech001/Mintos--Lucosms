@@ -13,7 +13,7 @@ import UserForm from "./UserForm";
 import ComponentCard from "../../components/common/ComponentCard";
 
 // API Base URL
-const API_BASE_URL = 'http://localhost:8000/api/v1';
+const API_BASE_URL = 'https://lucomintos.onrender.com';
 
 // Get token from localStorage or context
 const getAuthToken = () => {

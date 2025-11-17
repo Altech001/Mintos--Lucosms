@@ -10,12 +10,12 @@ import Button from '../../components/ui/button/Button';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 
 // API Base URL
-const API_BASE_URL = 'http://localhost:8000/api/v1';
+const API_BASE_URL = 'https://lucomintos.onrender.com';
 
 // Get token from localStorage or context
 const getAuthToken = () => {
   // Replace with your actual token management
-  return localStorage.getItem('authToken') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NjM2MzIyMzYsInN1YiI6IjU0NjRkNjBhLTI0MzgtNGNmZi05N2MzLWNmOGI4MTFhNWYxYSJ9.NfQMHEjeJEijQ15EXCepdO8uSWGDx74nuQyA0Gs1aDo';
+  return localStorage.getItem('authToken');
 };
 
 // API Functions
