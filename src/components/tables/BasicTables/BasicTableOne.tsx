@@ -316,7 +316,7 @@ export default function BasicTableOne({
                       <Badge
                         size="sm"
                         color={
-                          sms.delivery_status === "success"
+                          sms.status === "success"
                             ? "success"
                             : sms.status === "pending"
                             ? "warning"
