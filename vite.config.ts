@@ -15,6 +15,11 @@ export default defineConfig({
       },
     }),
   ],
+  server: {
+    hmr: {
+      overlay: false,
+    },
+  },
   build: {
     rollupOptions: {
       output: {

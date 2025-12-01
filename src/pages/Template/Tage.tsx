@@ -11,16 +11,16 @@ export default function VideoPage() {
         title="How To Create SMS Templates"
         description="Learn how to create SMS templates effectively."
       />
-      
+
       <PageBreadcrumb pageTitle="How To Create SMS Templates" />
-      
+
       <div className="min-h-auto p-2 rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/3">
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6 xl:grid-cols-2">
-          <ComponentCard title="Custom Templates From Scratch">
+          <ComponentCard title="Creating Templates From Scratch">
             <SixteenIsToNine />
           </ComponentCard>
 
-          <ComponentCard title="Using Pre-Built Templates">
+          <ComponentCard title="Sending Bulky Messages On LucoSMS Platform">
             <FourIsToThree />
           </ComponentCard>
         </div>

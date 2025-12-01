@@ -26,8 +26,8 @@ export default function FundsModal({ user, onClose, onAddFunds, onDeductFunds, i
 
   return (
     <div className="space-y-4">
-      <p>Managing funds for <strong>{user.fullName || user.email}</strong>.</p>
-      <p>Current Balance: <strong>${parseFloat(user.wallet || '0').toFixed(2)}</strong></p>
+      <p className="text-md dark:text-gray-300">Managing funds for <strong>{user.fullName || user.email}</strong>.</p>
+      <p className="text-md dark:text-gray-300">Current Balance: <strong>UGx {parseFloat(user.wallet || '0').toFixed(2)}</strong></p>
       <div>
         <Label>Amount</Label>
         <Input

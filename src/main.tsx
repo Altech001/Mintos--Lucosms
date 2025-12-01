@@ -19,8 +19,21 @@ createRoot(document.getElementById("root")!).render(
       <AuthProvider>
         <QueryClientProvider client={queryClient}>
           <AppWrapper>
+            <ToastContainer
+              position="top-center"
+              autoClose={4000}
+              hideProgressBar={false}
+              newestOnTop={true}
+              closeOnClick
+              rtl={false}
+              pauseOnFocusLoss
+              draggable
+              pauseOnHover
+              theme="light"
+              limit={3}
+              className="!z-[999999]"
+            />
             <App />
-            <ToastContainer />
           </AppWrapper>
         </QueryClientProvider>
       </AuthProvider>

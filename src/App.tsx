@@ -27,6 +27,7 @@ import ListTemplates from "./pages/Template/ListTemplates";
 import Tage from "./pages/Template/Tage";
 import Whatsapp from "./pages/UnderDev/Whatsapp";
 import UserServices from "./pages/Admin/UserServices";
+import SpecialMge from "./pages/Dashboard/SpecialMge";
 
 export default function App() {
   return (
@@ -54,7 +55,7 @@ export default function App() {
               <Route path="/logs" element={<ActivityLogs />} />
               <Route path="/notifications" element={<Notifications />} />
               <Route path="/developer/api-keys" element={<ApiKeysPage />} />
-              {/* <Route path="/subscriptions" element={<Subscribptions />} /> */}
+              <Route path="/special-message" element={<SpecialMge />} />
             </Route>
           </Route>
 

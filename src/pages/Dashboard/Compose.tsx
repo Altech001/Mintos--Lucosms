@@ -8,6 +8,7 @@ import {
   BrushCleaning,
   CheckCircle,
   ChevronRight,
+  CloudUpload,
   CloudUploadIcon,
   Eye,
   Loader,
@@ -16,8 +17,9 @@ import {
   Paperclip,
   Plus,
   Send,
+  SpellCheckIcon,
   Users,
-  X,
+  X
 } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
 import { useDropzone } from "react-dropzone";
@@ -141,6 +143,8 @@ export default function ComposePage() {
   const templatesScrollerRef = useRef<HTMLDivElement>(null);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [senderId, setSenderId] = useState<string>("");
+  const [showUseNumbersModal, setShowUseNumbersModal] = useState(false);
+  const [rawNumbersInput, setRawNumbersInput] = useState("");
 
   // Helpers: API error handling
   const isAuthError = (err: unknown) => {
@@ -173,17 +177,17 @@ export default function ComposePage() {
   const normalizePhones = (raw: string[]): { valid: string[]; invalid: number } => {
     const result = new Set<string>();
     let invalid = 0;
-    
+
     for (const n of raw) {
       let input = (n || '').toString().trim();
-      if (!input) { 
-        invalid++; 
-        continue; 
+      if (!input) {
+        invalid++;
+        continue;
       }
-      
+
       // Remove all non-digit characters except +
       input = input.replace(/[^+\d]/g, '');
-      
+
       // Format Uganda numbers to +256 format
       // Case 1: Starts with 7 (local format without 0) → +2567xx
       if (/^7\d{8}$/.test(input)) {
@@ -209,32 +213,32 @@ export default function ComposePage() {
       else if (/^0\d+$/.test(input)) {
         input = '+256' + input.substring(1);
       }
-      
+
       try {
         // Parse and validate using libphonenumber-js
         const pn = input.startsWith('+')
           ? parsePhoneNumberFromString(input)
           : parsePhoneNumberFromString((DEFAULT_CC || '+256') + input.replace(/^0+/, ''));
-          
-        if (!pn || !pn.isValid()) { 
-          invalid++; 
-          continue; 
+
+        if (!pn || !pn.isValid()) {
+          invalid++;
+          continue;
         }
-        
+
         const e164 = pn.number; // E.164 format: +CCCxxxxxxxxx
-        
+
         // Only accept Uganda numbers (+256)
-        if (!e164.startsWith('+256')) { 
-          invalid++; 
-          continue; 
+        if (!e164.startsWith('+256')) {
+          invalid++;
+          continue;
         }
-        
+
         result.add(e164);
       } catch {
         invalid++;
       }
     }
-    
+
     return { valid: Array.from(result), invalid };
   };
 
@@ -357,7 +361,7 @@ export default function ComposePage() {
     staleTime: 60_000,
   });
 
-  
+
 
   const importContactsFromGroup = useCallback(async (backendGroupId: string) => {
     // Fetch contacts for selected backend group (paginate if needed)
@@ -682,6 +686,39 @@ export default function ComposePage() {
     }
   };
 
+  const handleProcessNumbers = () => {
+    const rawList = rawNumbersInput.split(/[\n,;\s]+/).filter(s => s.trim());
+    const { valid, invalid } = normalizePhones(rawList);
+
+    if (valid.length === 0) {
+      showErrorToast("No valid phone numbers found.");
+      return;
+    }
+
+    const newContacts: Contact[] = valid.map((phone, idx) => ({
+      id: `manual-bulk-${Date.now()}-${idx}`,
+      name: `Number ${idx + 1}`,
+      phone: phone,
+    }));
+
+    const newGroup: ContactGroup = {
+      id: `group-manual-${Date.now()}`,
+      number: groups.length + 1,
+      contacts: newContacts,
+      startIndex: totalContacts + 1,
+      endIndex: totalContacts + newContacts.length,
+    };
+
+    setGroups([...groups, newGroup]);
+    setTotalContacts(prev => prev + newContacts.length);
+    setSelectedGroups(prev => new Set(prev).add(newGroup.id));
+
+    showSuccessToast(`Added ${valid.length} numbers. ${invalid > 0 ? `Skipped ${invalid} invalid.` : ''}`);
+
+    setRawNumbersInput("");
+    setShowUseNumbersModal(false);
+  };
+
   // ──────────────────────────────────────────────────────────────────────
   // Templates from API → map to local Template interface
   const apiTemplates: Template[] = (templatesQuery.data?.data || []).map((t: TemplatePublic) => ({
@@ -712,10 +749,19 @@ export default function ComposePage() {
                   <h3 className="text-lg font-semibold text-gray-600 dark:text-gray-300">
                     Contacts ({groups.length})
                   </h3>
-                  <Button onClick={() => setShowAddNumber(true)}>
-                    <Plus className="w-4 h-4" />
-                    Add Number
-                  </Button>
+                  <div className="flex gap-2 items-center">
+                    <button
+                      onClick={() => setShowImport(true)}
+                      className="flex items-center flex-col gap-2 text-brand-500 text-sm hover:underline mt-1"
+                    >
+                      <CloudUpload />
+                      Re Import
+                    </button>
+                    <Button onClick={() => setShowAddNumber(true)}>
+                      <Plus className="w-4 h-4" />
+                      Add Number
+                    </Button>
+                  </div>
                 </div>
 
                 <div className="flex-1 overflow-y-auto mb-4 space-y-3">
@@ -739,11 +785,10 @@ export default function ComposePage() {
                         <div
                           key={group.id}
                           onClick={() => toggleGroupSelection(group.id)}
-                          className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${
-                            isSelected
-                              ? `${color.border} `
-                              : "border-gray-200 dark:border-gray-700 bg-transparent   hover:border-gray-300"
-                          }`}
+                          className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${isSelected
+                            ? `${color.border} `
+                            : "border-gray-200 dark:border-gray-700 bg-transparent   hover:border-gray-300"
+                            }`}
                         >
                           <div className="flex items-center justify-between mb-1">
                             <span
@@ -777,14 +822,13 @@ export default function ComposePage() {
                     })
                   )}
                 </div>
-
-                <div className="space-y-2 border-t border-gray-300 dark:border-gray-700 pt-4">
-                  <Button onClick={selectAllGroups} className="w-full">
-                    {selectedGroups.size === groups.length
-                      ? "Deselect All"
-                      : "Select All"}
-                  </Button>
-                </div>
+                <Button
+                  onClick={() => setShowGroupImport(true)}
+                  variant="outline"
+                >
+                  <Users className="w-4 h-4" />
+                  Import From Group
+                </Button>
 
                 <div className="mt-4 pt-4 border-t border-gray-300 dark:border-gray-700">
                   <p className="text-sm text-gray-600 dark:text-gray-300">
@@ -805,18 +849,18 @@ export default function ComposePage() {
                   </h3>
                   <div className="flex gap-2">
                     <Button
+                      onClick={() => setShowUseNumbersModal(true)}
+                      variant="primary"
+                    >
+                      <SpellCheckIcon className="w-4 h-4" />
+                      Use Numbers
+                    </Button>
+                    <Button
                       onClick={() => setShowTemplates(true)}
                       variant="outline"
                     >
                       <LucideGalleryHorizontal className="w-4 h-4 text-blue-500" />
                       Use Template
-                    </Button>
-                    <Button
-                      onClick={() => setShowGroupImport(true)}
-                      variant="outline"
-                    >
-                      <Users className="w-4 h-4" />
-                      Import From Group
                     </Button>
                     <Button
                       onClick={() => setSelectedGroups(new Set())}
@@ -852,8 +896,9 @@ export default function ComposePage() {
                       <Button onClick={selectAllGroups} variant="outline">
                         <BrushCleaning className="w-6 h-6 text-gray-400 cursor-pointer float-right mr-2" />
                         {selectedGroups.size === groups.length
-                          ? "Deselect All"
-                          : "Select All"}
+                          ? "Deselect Batch"
+                          : "Select All"
+                        }
                       </Button>
                       <Button
                         variant="outline"
@@ -980,9 +1025,8 @@ export default function ComposePage() {
           <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-lg w-full p-6">
             <div
               {...getRootProps()}
-              className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors ${
-                isDragActive ? "border-brand-500" : "border-gray-600 "
-              }`}
+              className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors ${isDragActive ? "border-brand-500" : "border-gray-600 "
+                }`}
             >
               {/* <Input {...getInputProps()} /> */}
               <CloudUploadIcon className="w-12 h-12 mx-auto text-gray-400 mb-4" />
@@ -1073,7 +1117,7 @@ export default function ComposePage() {
                   key={g.id}
                   onClick={() => { setSelectedBatchId(g.id); setShowChooseBatch(false); }}
                   disabled={g.contacts.length >= CHUNK_SIZE}
-                  className={`w-full text-left p-3 rounded border ${selectedBatchId===g.id?"border-brand-500":"border-gray-300 dark:border-gray-700"} ${g.contacts.length>=CHUNK_SIZE?"opacity-50 cursor-not-allowed":"hover:bg-gray-50 dark:hover:bg-white/5"}`}
+                  className={`w-full text-left p-3 rounded border ${selectedBatchId === g.id ? "border-brand-500" : "border-gray-300 dark:border-gray-700"} ${g.contacts.length >= CHUNK_SIZE ? "opacity-50 cursor-not-allowed" : "hover:bg-gray-50 dark:hover:bg-white/5"}`}
                 >
                   <div className="flex items-center justify-between">
                     <span className="font-medium">Batch {g.number}</span>
@@ -1299,11 +1343,10 @@ export default function ComposePage() {
                 return (
                   <div
                     key={item.id}
-                    className={`p-4 rounded-xl border-2 ${
-                      isSingle
-                        ? "border-green-300 bg-green-50"
-                        : `${color.border} ${color.bg}`
-                    }`}
+                    className={`p-4 rounded-xl border-2 ${isSingle
+                      ? "border-green-300 bg-green-50"
+                      : `${color.border} ${color.bg}`
+                      }`}
                   >
                     <div className="flex justify-between mb-2">
                       <p className="font-medium">
@@ -1326,11 +1369,10 @@ export default function ComposePage() {
                     )}
                     <div className="mt-2 w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                       <div
-                        className={`h-full rounded-full transition-all ${
-                          item.status === "completed"
-                            ? "bg-green-600"
-                            : "bg-brand-600"
-                        }`}
+                        className={`h-full rounded-full transition-all ${item.status === "completed"
+                          ? "bg-green-600"
+                          : "bg-brand-600"
+                          }`}
                         style={{ width: `${item.progress}%` }}
                       />
                     </div>
@@ -1371,7 +1413,7 @@ export default function ComposePage() {
                   // Format phone number for display
                   const formatted = normalizePhones([c.phone]);
                   const displayPhone = formatted.valid.length > 0 ? formatted.valid[0] : c.phone;
-                  
+
                   return (
                     <div
                       key={i}
@@ -1389,6 +1431,44 @@ export default function ComposePage() {
                     </div>
                   );
                 })}
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ────────────────────── Use Numbers Modal ────────────────────── */}
+      {showUseNumbersModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-lg w-full p-6 space-y-4">
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+              Paste Numbers
+            </h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Paste your phone numbers below. They will be automatically formatted to +256.
+              Separated by newlines, commas, or spaces.
+            </p>
+            <TextArea
+              className="w-full h-48 p-4 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none dark:bg-gray-800 dark:border-gray-700 dark:text-white"
+              placeholder="0771234567&#10;0701234567&#10;+256781234567"
+              value={rawNumbersInput}
+              onChange={(val) => setRawNumbersInput(val)}
+            />
+            <div className="flex justify-end gap-3">
+              <Button
+                onClick={() => {
+                  setShowUseNumbersModal(false);
+                  setRawNumbersInput("");
+                }}
+                variant="outline"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleProcessNumbers}
+                disabled={!rawNumbersInput.trim()}
+                variant="primary"
+              >
+                Process Numbers
+              </Button>
             </div>
           </div>
         </div>

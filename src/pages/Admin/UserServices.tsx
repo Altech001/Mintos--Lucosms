@@ -1,21 +1,23 @@
 
-
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Activity, AlertCircle, BarChart3, DollarSign, MessageSquare, RefreshCw, Users } from 'lucide-react';
+import { Activity, AlertCircle, BarChart3, CreditCard, MessageSquare, Plus, RefreshCw, Search, Users, Wallet, CheckSquare, Square, Filter, MoreVertical, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { useState } from 'react';
 import ComponentCard from '../../components/common/ComponentCard';
-import Checkbox from '../../components/form/input/Checkbox';
 import Input from '../../components/form/input/InputField';
 import Button from '../../components/ui/button/Button';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
+import AlertDialog from '../../components/ui/modal/AlertDialog';
 
 // API Base URL
 const API_BASE_URL = import.meta.env.VITE_API_URL;
 
-// Get token from localStorage or context
-const getAuthToken = () => {
-  // Replace with your actual token management
-  return localStorage.getItem('access_token');
+// Helper for headers
+const getHeaders = () => {
+  const token = localStorage.getItem('access_token');
+  return {
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json',
+  };
 };
 
 // API Functions
@@ -28,10 +30,7 @@ const fetchUsers = async (filters: SearchFilters) => {
   params.append('limit', filters.limit.toString());
 
   const response = await fetch(`${API_BASE_URL}/api/v1/admin/users/search?${params}`, {
-    headers: {
-      'Authorization': `Bearer ${getAuthToken()}`,
-      'Content-Type': 'application/json',
-    },
+    headers: getHeaders(),
   });
 
   if (!response.ok) {
@@ -43,10 +42,7 @@ const fetchUsers = async (filters: SearchFilters) => {
 
 const fetchSystemStats = async () => {
   const response = await fetch(`${API_BASE_URL}/api/v1/admin/system/stats`, {
-    headers: {
-      'Authorization': `Bearer ${getAuthToken()}`,
-      'Content-Type': 'application/json',
-    },
+    headers: getHeaders(),
   });
 
   if (!response.ok) {
@@ -58,10 +54,7 @@ const fetchSystemStats = async () => {
 
 const fetchSMSAnalytics = async (days: number = 30) => {
   const response = await fetch(`${API_BASE_URL}/api/v1/admin/analytics/sms-overview?days=${days}`, {
-    headers: {
-      'Authorization': `Bearer ${getAuthToken()}`,
-      'Content-Type': 'application/json',
-    },
+    headers: getHeaders(),
   });
 
   if (!response.ok) {
@@ -74,10 +67,7 @@ const fetchSMSAnalytics = async (days: number = 30) => {
 const addUserBalance = async ({ userId, amount, description }: { userId: string; amount: number; description: string }) => {
   const response = await fetch(`${API_BASE_URL}/api/v1/admin/users/${userId}/add-balance`, {
     method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${getAuthToken()}`,
-      'Content-Type': 'application/json',
-    },
+    headers: getHeaders(),
     body: JSON.stringify({
       user_id: userId,
       amount,
@@ -97,10 +87,7 @@ const toggleUserStatus = async ({ userId, activate }: { userId: string; activate
   const endpoint = activate ? 'activate' : 'deactivate';
   const response = await fetch(`${API_BASE_URL}/api/v1/admin/users/${userId}/${endpoint}`, {
     method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${getAuthToken()}`,
-      'Content-Type': 'application/json',
-    },
+    headers: getHeaders(),
   });
 
   if (!response.ok) {
@@ -113,10 +100,7 @@ const toggleUserStatus = async ({ userId, activate }: { userId: string; activate
 const bulkUpdateUserPlan = async ({ userIds, newPlan }: { userIds: string[]; newPlan: string }) => {
   const response = await fetch(`${API_BASE_URL}/api/v1/admin/users/bulk-update-plan?new_plan=${newPlan}`, {
     method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${getAuthToken()}`,
-      'Content-Type': 'application/json',
-    },
+    headers: getHeaders(),
     body: JSON.stringify(userIds),
   });
 
@@ -138,6 +122,9 @@ interface User {
   total_sms_sent: number;
   total_transactions: number;
   created_at: string | null;
+  plan?: string;
+  wallet_balance?: number;
+  sms_sent?: number;
 }
 
 interface SearchFilters {
@@ -175,6 +162,13 @@ interface SMSAnalytics {
   status_breakdown: Record<string, number>;
 }
 
+interface AlertState {
+  isOpen: boolean;
+  title: string;
+  message: string;
+  type: 'success' | 'error' | 'warning' | 'info';
+}
+
 function UserServices() {
   const [searchFilters, setSearchFilters] = useState<SearchFilters>({
     query: '',
@@ -190,10 +184,17 @@ function UserServices() {
   const [topupDescription] = useState('Admin credit adjustment');
   const [activeTab, setActiveTab] = useState('users');
 
+  const [alertState, setAlertState] = useState<AlertState>({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'info'
+  });
+
   const queryClient = useQueryClient();
 
   // Real API calls
-  const { data: users = [], isLoading: usersLoading, error: usersError, refetch: refetchUsers } = useQuery({
+  const { data: users = [], isLoading: usersLoading, error: usersError, refetch: refetchUsers } = useQuery<User[]>({
     queryKey: ['users', searchFilters],
     queryFn: () => fetchUsers(searchFilters),
     staleTime: 30000, // 30 seconds
@@ -211,6 +212,10 @@ function UserServices() {
     staleTime: 60000, // 1 minute
   });
 
+  const showAlert = (title: string, message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
+    setAlertState({ isOpen: true, title, message, type });
+  };
+
   const topupMutation = useMutation({
     mutationFn: addUserBalance,
     onSuccess: (data) => {
@@ -219,11 +224,10 @@ function UserServices() {
       setShowTopupModal(false);
       setTopupAmount('');
       setSelectedUser(null);
-      // Show success message
-      alert(`Balance added successfully! New balance: UGX ${data.balance_after}`);
+      showAlert('Success', `Balance added successfully! New balance: UGX ${data.balance_after}`, 'success');
     },
     onError: (error) => {
-      alert(`Failed to add balance: ${error.message}`);
+      showAlert('Error', `Failed to add balance: ${error.message}`, 'error');
     }
   });
 
@@ -232,10 +236,10 @@ function UserServices() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
       queryClient.invalidateQueries({ queryKey: ['systemStats'] });
-      alert(data.message || 'User status updated successfully');
+      showAlert('Success', data.message || 'User status updated successfully', 'success');
     },
     onError: (error) => {
-      alert(`Failed to update user status: ${error.message}`);
+      showAlert('Error', `Failed to update user status: ${error.message}`, 'error');
     }
   });
 
@@ -245,10 +249,10 @@ function UserServices() {
       queryClient.invalidateQueries({ queryKey: ['users'] });
       queryClient.invalidateQueries({ queryKey: ['systemStats'] });
       setSelectedUsers([]);
-      alert(data.message || 'User plans updated successfully');
+      showAlert('Success', data.message || 'User plans updated successfully', 'success');
     },
     onError: (error) => {
-      alert(`Failed to update user plans: ${error.message}`);
+      showAlert('Error', `Failed to update user plans: ${error.message}`, 'error');
     }
   });
 
@@ -272,298 +276,331 @@ function UserServices() {
     }
   };
 
-
+  // Helper to get initials
+  const getInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map((n) => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+  };
 
   return (
-    <ComponentCard title="User Services" desc="Manage users, analytics, and system operations">
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
-      {/* Header */}
-      <div className=" rounded-xl dark:text-white">
-        <div className="flex items-center justify-between">
-          <div className="flex space-x-3">
-            <Button
-              onClick={handleRefreshAll}
-              variant="outline"
-              className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg font-medium transition-colors backdrop-blur-sm"
-            >
-              <RefreshCw className="w-4 h-4 inline mr-2" />
-              Refresh
-            </Button>
-            <Button
-              onClick={() => setActiveTab('users')}
-              variant='primary'
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                activeTab === 'users' ? 'text-white' : 'backdrop-blur-sm'
-              }`}
-            >
-              <Users className="w-4 h-4 inline mr-2" />
-              Users
-            </Button>
-            <Button
-              onClick={() => setActiveTab('analytics')}
-              variant='outline'
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                activeTab === 'analytics' ? '' : ' backdrop-blur-sm'
-              }`}
-            >
-              <BarChart3 className="w-4 h-4 inline mr-2" />
-              Analytics
-            </Button>
-          </div>
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">User Services</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Manage users, analytics, and system operations</p>
+        </div>
+        <div className="flex gap-3">
+          <Button
+            onClick={handleRefreshAll}
+            variant="outline"
+            size="sm"
+            className="bg-white dark:bg-gray-800"
+          >
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Refresh Data
+          </Button>
         </div>
       </div>
 
-      {activeTab === 'users' && (
-        <>
-          {/* Search Filters */}
-          <div className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold dark:text-white">Search & Filter Users</h2>
-              {usersError && (
-                <div className="flex items-center text-red-600 text-sm">
-                  <AlertCircle className="w-4 h-4 mr-1" />
-                  Error loading users
+      {/* Stats Overview */}
+      {activeTab === 'analytics' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[
+            { label: 'Total Users', value: systemStats?.total_users || 0, icon: Users, color: 'blue', change: '+12%' },
+            { label: 'Active Users', value: systemStats?.active_users || 0, icon: Activity, color: 'emerald', change: '+5%' },
+            { label: 'SMS Sent', value: systemStats?.total_sms_sent || 0, icon: MessageSquare, color: 'violet', change: '+24%' },
+            { label: 'Transactions', value: systemStats?.total_transactions || 0, icon: CreditCard, color: 'amber', change: '+8%' },
+          ].map((stat, i) => (
+            <div key={i} className="bg-white dark:bg-gray-800 rounded-xl p-5 border border-gray-100 dark:border-gray-700">
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">{stat.label}</p>
+                  <h3 className="text-2xl font-bold text-gray-900 dark:text-white mt-2">{stat.value.toLocaleString()}</h3>
                 </div>
-              )}
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-white mb-2">
-                  Search Users
-                </label>
-                <div className="relative">
-                  
-                  <Input
-                    type="text"
-                    placeholder="&nbsp; Email, name, or ID"
-                    value={searchFilters.query}
-                    onChange={(e) => setSearchFilters(prev => ({ ...prev, query: e.target.value }))}
-                  />
-                  
+                <div className={`p-2 rounded-lg bg-${stat.color}-50 dark:bg-${stat.color}-900/20 text-${stat.color}-600 dark:text-${stat.color}-400`}>
+                  <stat.icon className="w-5 h-5" />
                 </div>
               </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-white mb-2">
-                  Plan Filter
-                </label>
+              <div className="mt-4 flex items-center text-xs">
+                <span className="text-green-600 dark:text-green-400 flex items-center font-medium">
+                  <ArrowUpRight className="w-3 h-3 mr-1" />
+                  {stat.change}
+                </span>
+                <span className="text-gray-400 ml-2">from last month</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Tabs */}
+      <div className="border-b border-gray-200 dark:border-gray-700">
+        <nav className="-mb-px flex space-x-8" aria-label="Tabs">
+          <button
+            onClick={() => setActiveTab('users')}
+            className={`${activeTab === 'users'
+              ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
+              } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 transition-colors`}
+          >
+            <Users className="w-4 h-4" />
+            Users Management
+          </button>
+          <button
+            onClick={() => setActiveTab('analytics')}
+            className={`${activeTab === 'analytics'
+              ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
+              } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 transition-colors`}
+          >
+            <BarChart3 className="w-4 h-4" />
+            Analytics & Stats
+          </button>
+        </nav>
+      </div>
+
+      {activeTab === 'users' && (
+        <div className="space-y-6">
+          {/* Filters Toolbar */}
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700 flex flex-col md:flex-row gap-4 items-center justify-between">
+            <div className="relative w-full md:w-96">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Search className="h-4 w-4 text-gray-400" />
+              </div>
+              <input
+                type="text"
+                className="block w-full pl-10 pr-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg leading-5 bg-gray-50 dark:bg-gray-900/50 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 sm:text-sm transition duration-150 ease-in-out"
+                placeholder="Search users..."
+                value={searchFilters.query}
+                onChange={(e) => setSearchFilters(prev => ({ ...prev, query: e.target.value }))}
+              />
+            </div>
+
+            <div className="flex items-center gap-3 w-full md:w-auto overflow-x-auto pb-2 md:pb-0">
+              <select
+                value={searchFilters.plan}
+                onChange={(e) => setSearchFilters(prev => ({ ...prev, plan: e.target.value }))}
+                className="block pl-3 pr-8 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+              >
+                <option value="">All Plans</option>
+                <option value="Basic">Basic</option>
+                <option value="Standard">Standard</option>
+                <option value="Premium">Premium</option>
+              </select>
+
+              <select
+                value={searchFilters.is_active === null ? '' : searchFilters.is_active.toString()}
+                onChange={(e) => setSearchFilters(prev => ({
+                  ...prev,
+                  is_active: e.target.value === '' ? null : e.target.value === 'true'
+                }))}
+                className="block pl-3 pr-8 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+              >
+                <option value="">All Status</option>
+                <option value="true">Active</option>
+                <option value="false">Inactive</option>
+              </select>
+
+              <Button
+                onClick={handleSearch}
+                disabled={usersLoading}
+                variant="primary"
+                size="sm"
+                className="whitespace-nowrap"
+              >
+                {usersLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : 'Search'}
+              </Button>
+            </div>
+          </div>
+
+          {/* Bulk Actions Banner */}
+          {selectedUsers.length > 0 && (
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-xl p-4 flex items-center justify-between animate-in fade-in slide-in-from-top-2">
+              <div className="flex items-center gap-3 text-blue-700 dark:text-blue-300">
+                <span className="bg-blue-100 dark:bg-blue-800 p-1 rounded">
+                  <CheckSquare className="w-4 h-4" />
+                </span>
+                <span className="font-medium">{selectedUsers.length} selected</span>
+              </div>
+              <div className="flex items-center gap-3">
                 <select
-                  value={searchFilters.plan}
-                  onChange={(e) => setSearchFilters(prev => ({ ...prev, plan: e.target.value }))}
-                  className="w-full appearance-none rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 pr-11 text-sm shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                > 
-                  <option value="">All Plans</option>
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      bulkUpdatePlanMutation.mutate({ userIds: selectedUsers, newPlan: e.target.value });
+                      e.target.value = '';
+                    }
+                  }}
+                  disabled={bulkUpdatePlanMutation.isPending}
+                  className="text-sm border-0 bg-white dark:bg-gray-800 rounded-lg py-1.5 pl-3 pr-8 ring-1 ring-blue-200 dark:ring-blue-700 focus:ring-2 focus:ring-blue-500"
+                  defaultValue=""
+                >
+                  <option value="">Change Plan...</option>
                   <option value="Basic">Basic</option>
                   <option value="Standard">Standard</option>
                   <option value="Premium">Premium</option>
                 </select>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-white mb-2">
-                  Status Filter
-                </label>
-                <select
-                  value={searchFilters.is_active === null ? '' : searchFilters.is_active.toString()}
-                  onChange={(e) => setSearchFilters(prev => ({ 
-                    ...prev, 
-                    is_active: e.target.value === '' ? null : e.target.value === 'true' 
-                  }))}
-                  className="w-full appearance-none rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 pr-11 text-sm shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                <Button
+                  onClick={() => setSelectedUsers([])}
+                  variant="primary"
+                  size="sm"
+                  className="text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-800"
                 >
-                  <option value="">All Status</option>
-                  <option value="true">Active</option>
-                  <option value="false">Inactive</option>
-                </select>
-              </div>
-              
-              <div className="flex items-end">
-                <button
-                  onClick={handleSearch}
-                  disabled={usersLoading}
-                  className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-2 rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all font-medium disabled:opacity-50 shadow-lg"
-                >
-                  {usersLoading ? (
-                    <RefreshCw className="w-4 h-4 animate-spin mx-auto" />
-                    
-                  ) : (
-                    'Search'
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Bulk Actions */}
-          {selectedUsers.length > 0 && (
-            <div className=" border border-blue-700 rounded-lg p-4">
-              <div className="flex items-center justify-between">
-                <span className="text-blue-800 font-medium">
-                  {selectedUsers.length} user(s) selected
-                </span>
-                <div className="flex space-x-2">
-                  <select
-                    onChange={(e) => {
-                      if (e.target.value) {
-                        bulkUpdatePlanMutation.mutate({ userIds: selectedUsers, newPlan: e.target.value });
-                        e.target.value = ''; 
-                      }
-                    }}
-                    disabled={bulkUpdatePlanMutation.isPending}
-                    className="border appearance-none rounded-lg border-gray-300 bg-transparent px-4 pr-11 text-sm shadow-theme-xs placeholder:text-gray-400  focus:outline-hidden focus:ring-3  dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:border-gray-600"
-                    defaultValue=""
-                  >
-                    <option value="">Change Plan</option>
-                    <option value="Basic">Basic</option>
-                    <option value="Standard">Standard</option>
-                    <option value="Premium">Premium</option>
-                  </select>
-                  <Button
-                    onClick={() => setSelectedUsers([])}
-                    className="px-3 py-1 bg-gray-500 text-white rounded text-sm hover:bg-gray-600"
-                  >
-                    Clear Selection
-                  </Button>
-                </div>
+                  Clear
+                </Button>
               </div>
             </div>
           )}
 
           {/* Users Table */}
-          <div className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] overflow-hidden">
+          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-gray-50 dark:bg-gray-800">
-                  <tr>
-                    <th className="px-6 py-3 text-left">
-                      
-                      <Checkbox
-                        checked={selectedUsers.length === users.length && users.length > 0}
-                        onChange={(checked) => {
-                          if (checked) {
-                            setSelectedUsers(users.map(u => u.id));
-                          } else {
+                <thead>
+                  <tr className="bg-gray-50/50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
+                    <th className="px-6 py-4 text-left w-10">
+                      <button
+                        onClick={() => {
+                          if (selectedUsers.length === users.length && users.length > 0) {
                             setSelectedUsers([]);
+                          } else {
+                            setSelectedUsers(users.map(u => u.id));
                           }
                         }}
-                      />
+                        className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors"
+                      >
+                        {selectedUsers.length === users.length && users.length > 0 ? (
+                          <CheckSquare className="w-5 h-5" />
+                        ) : (
+                          <Square className="w-5 h-5" />
+                        )}
+                      </button>
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      User
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Plan
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Wallet
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      SMS Sent
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Actions
-                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">User</th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Plan</th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Wallet</th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">SMS Sent</th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                    <th className="px-6 py-4 text-right text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="bg-white dark:bg-transparent divide-y divide-gray-200 dark:divide-gray-700">
+                <tbody className="divide-y divide-gray-100 dark:divide-gray-700/50">
                   {usersLoading ? (
                     <tr>
-                      <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
-                        <div className="flex items-center justify-center">
-                          <LoadingSpinner message='Searching...' />
-                        </div>
+                      <td colSpan={7} className="px-6 py-12 text-center">
+                        <LoadingSpinner message='Loading users...' />
                       </td>
                     </tr>
                   ) : usersError ? (
                     <tr>
-                      <td colSpan={7} className="px-6 py-8 text-center text-red-500 dark:text-red-400">
-                        <div className="flex items-center justify-center">
-                          <AlertCircle className="w-5 h-5 mr-2" />
-                          Failed to load users
+                      <td colSpan={7} className="px-6 py-12 text-center text-red-500">
+                        <div className="flex flex-col items-center justify-center gap-2">
+                          <AlertCircle className="w-6 h-6" />
+                          <span>Failed to load users. Please try again.</span>
                         </div>
                       </td>
                     </tr>
                   ) : users.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
-                        <div className="flex items-center justify-center">
-                          <Users className="w-5 h-5 mr-2" />
-                          No users found
+                      <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
+                        <div className="flex flex-col items-center justify-center gap-2">
+                          <Users className="w-8 h-8 opacity-20" />
+                          <span>No users found matching your filters.</span>
                         </div>
                       </td>
                     </tr>
                   ) : (
                     users.map((user) => (
-                      <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                      <tr key={user.id} className="group hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
                         <td className="px-6 py-4">
-                          <Checkbox 
-                          checked={selectedUsers.includes(user.id)}
-                          onChange={(checked) => {
-                            if (checked) {
-                              setSelectedUsers(prev => [...prev, user.id]);
-                            } else {
-                              setSelectedUsers(prev => prev.filter(id => id !== user.id));
-                            }
-                          }}
-                          />
+                          <button
+                            onClick={() => {
+                              if (selectedUsers.includes(user.id)) {
+                                setSelectedUsers(prev => prev.filter(id => id !== user.id));
+                              } else {
+                                setSelectedUsers(prev => [...prev, user.id]);
+                              }
+                            }}
+                            className={`transition-colors ${selectedUsers.includes(user.id) ? 'text-blue-600 dark:text-blue-500' : 'text-gray-300 hover:text-gray-500 dark:text-gray-600 dark:hover:text-gray-400'}`}
+                          >
+                            {selectedUsers.includes(user.id) ? (
+                              <CheckSquare className="w-5 h-5" />
+                            ) : (
+                              <Square className="w-5 h-5" />
+                            )}
+                          </button>
                         </td>
                         <td className="px-6 py-4">
-                          <div>
-                            <div className="text-sm font-medium text-gray-900 dark:text-gray-100">{user.full_name}</div>
-                            <div className="text-sm text-gray-500 dark:text-gray-400">{user.email}</div>
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900 dark:to-indigo-900 flex items-center justify-center text-blue-700 dark:text-blue-300 font-bold text-sm">
+                              {getInitials(user.full_name)}
+                            </div>
+                            <div className="flex flex-col">
+                              <span className="text-sm font-semibold text-gray-900 dark:text-white">{user.full_name}</span>
+                              <span className="text-xs text-gray-500 dark:text-gray-400">{user.email}</span>
+                            </div>
                           </div>
                         </td>
-                        <td className="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">
-                          <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 rounded-full text-xs font-medium">
-                            {user.plan || 'Basic'}
+                        <td className="px-6 py-4">
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-800">
+                            {user.plan_sub || user.plan || 'Basic'}
                           </span>
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">
-                          UGX {user.wallet_balance?.toLocaleString() || '0'}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">
-                          {user.sms_sent || 0}
                         </td>
                         <td className="px-6 py-4">
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            user.is_active 
-                              ? 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200' 
-                              : 'bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-200'
-                          }`}>
-                            {user.is_active ? 'Active' : 'Inactive'}
-                          </span>
+                          <div className="flex items-center gap-1.5 text-sm font-medium text-gray-900 dark:text-white">
+                            <span className="text-gray-400 dark:text-gray-500 text-xs">UGX</span>
+                            {user.wallet_balance?.toLocaleString() || parseFloat(user.wallet || '0').toLocaleString()}
+                          </div>
                         </td>
-                        <td className="px-6 py-4 text-sm font-medium space-x-2">
-                          <Button
-                            onClick={() => {
-                              setSelectedUser(user);
-                              setShowTopupModal(true);
-                            }}
-                            variant='outline'
-                            size='sm'
-                          >
-                            <DollarSign className="w-4 h-4 inline mr-1" />
-                            Topup
-                          </Button>
-                          <Button
-                            onClick={() => toggleUserStatusMutation.mutate({ 
-                              userId: user.id, 
-                              activate: !user.is_active 
-                            })}
-                            variant={user.is_active ? 'danger' : 'primary'}
-                            size='sm'
-                            disabled={toggleUserStatusMutation.isPending}
-                          >
-                            {toggleUserStatusMutation.isPending ? (
-                              <RefreshCw className="w-4 h-4 animate-spin" />
-                            ) : (
-                              user.is_active ? 'Deactivate' : 'Activate'
-                            )}
-
-                          </Button>
+                        <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300 font-medium">
+                          {user.total_sms_sent || user.sms_sent || 0}
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-2">
+                            <span className={`w-2 h-2 rounded-full ${user.is_active ? 'bg-emerald-500' : 'bg-red-500'}`}></span>
+                            <span className={`text-sm font-medium ${user.is_active ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400'}`}>
+                              {user.is_active ? 'Active' : 'Inactive'}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <Button
+                              onClick={() => {
+                                setSelectedUser(user);
+                                setShowTopupModal(true);
+                              }}
+                              variant="outline"
+                              size="sm"
+                              className="h-8 w-8 p-0 rounded-full hover:bg-blue-50 dark:hover:bg-blue-900/30 text-blue-600 dark:text-blue-400"
+                              title="Add Balance"
+                            >
+                              <Plus className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                            </Button>
+                            <Button
+                              onClick={() => toggleUserStatusMutation.mutate({
+                                userId: user.id,
+                                activate: !user.is_active
+                              })}
+                              variant="outline"
+                              size="sm"
+                              className={`h-8 w-8 p-0 rounded-full ${user.is_active
+                                ? 'hover:bg-red-50 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400'
+                                : 'hover:bg-emerald-50 dark:hover:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400'
+                                }`}
+                              disabled={toggleUserStatusMutation.isPending}
+                              title={user.is_active ? 'Deactivate User' : 'Activate User'}
+                            >
+                              {toggleUserStatusMutation.isPending ? (
+                                <RefreshCw className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <RefreshCw className="w-4 h-4" />
+                              )}
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                     ))
@@ -572,171 +609,94 @@ function UserServices() {
               </table>
             </div>
           </div>
-        </>
+        </div>
       )}
 
       {activeTab === 'analytics' && (
-        <>
-          {/* System Stats */}
-          {statsLoading ? (
-            <div className="rounded-xl border border-gray-100 dark:border-gray-700 p-8">
-              <div className="flex items-center justify-center">
-                <RefreshCw className="w-6 h-6 animate-spin mr-2 text-blue-600" />
-                <span className="text-gray-600 dark:text-gray-400">Loading system statistics...</span>
-              </div>
-            </div>
-          ) : statsError ? (
-            <div className="rounded-xl border border-red-200 dark:border-red-700 bg-white dark:bg-red-900/10 p-8">
-              <div className="flex items-center justify-center text-red-600 dark:text-red-400">
-                <AlertCircle className="w-6 h-6 mr-2" />
-                <span>Failed to load system statistics</span>
-              </div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              <div className="bg-gradient-to-br from-blue-100 to-blue-400 dark:from-blue-900/30 dark:to-blue-800/30 rounded-xl border border-blue-200 dark:border-blue-700 p-6 hover:shadow-xl transition-shadow">
-                <div className="flex items-center">
-                  <div className="p-3 bg-blue-600 rounded-xl shadow-lg">
-                    <Users className="w-6 h-6 text-white" />
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-blue-700 dark:text-blue-300">Total Users</p>
-                    <p className="text-3xl font-bold text-blue-900 dark:text-blue-100">{systemStats?.total_users || 0}</p>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="bg-gradient-to-br from-green-100 to-green-300 dark:from-green-900/30 dark:to-green-800/30 rounded-xl border border-green-200 dark:border-green-700 p-6 hover:shadow-xl transition-shadow">
-                <div className="flex items-center">
-                  <div className="p-3 bg-green-600 rounded-xl shadow-lg">
-                    <Activity className="w-6 h-6 text-white" />
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-green-700 dark:text-green-300">Active Users</p>
-                    <p className="text-3xl font-bold text-green-900 dark:text-green-100">{systemStats?.active_users || 0}</p>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="bg-gradient-to-br from-purple-100 to-purple-200 dark:from-purple-900/30 dark:to-purple-800/30 rounded-xl border border-purple-200 dark:border-purple-700 p-6 hover:shadow-xl transition-shadow">
-                <div className="flex items-center">
-                  <div className="p-3 bg-purple-600 rounded-xl shadow-lg">
-                    <MessageSquare className="w-6 h-6 text-white" />
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-purple-700 dark:text-purple-300">SMS Sent</p>
-                    <p className="text-3xl font-bold text-purple-900 dark:text-purple-100">{systemStats?.total_sms_sent || 0}</p>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="bg-gradient-to-br from-yellow-100 to-yellow-200 dark:from-yellow-900/30 dark:to-yellow-800/30 rounded-xl border border-yellow-200 dark:border-yellow-700 p-6 hover:shadow-xl transition-shadow">
-                <div className="flex items-center">
-                  <div className="p-3 bg-yellow-600 rounded-xl shadow-lg">
-                    <DollarSign className="w-6 h-6 text-white" />
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-yellow-700 dark:text-yellow-300">Transactions</p>
-                    <p className="text-3xl font-bold text-yellow-900 dark:text-yellow-100">{systemStats?.total_transactions || 0}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* SMS Analytics */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 ">
-            <div className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] p-6">
+        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* SMS Analytics */}
+            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 p-6">
               <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-bold text-gray-900 dark:text-gray-200">SMS Overview (30 Days)</h3>
-                {analyticsLoading && <RefreshCw className="w-5 h-5 animate-spin text-blue-600" />}
-                {analyticsError && <AlertCircle className="w-5 h-5 text-red-500" />}
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                  <BarChart3 className="w-5 h-5 text-gray-500" />
+                  SMS Overview (30 Days)
+                </h3>
+                {analyticsLoading && <RefreshCw className="w-4 h-4 animate-spin text-blue-500" />}
               </div>
-              
+
               {analyticsLoading ? (
-                <div className="space-y-4">
-                  {[...Array(5)].map((_, i) => (
-                    <div key={i} className="animate-pulse">
-                      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4 mb-2"></div>
-                      <div className="h-6 bg-gray-300 dark:bg-gray-600 rounded w-1/2"></div>
-                    </div>
+                <div className="space-y-4 animate-pulse">
+                  {[...Array(4)].map((_, i) => (
+                    <div key={i} className="h-12 bg-gray-100 dark:bg-gray-700 rounded-lg"></div>
                   ))}
                 </div>
               ) : analyticsError ? (
-                <div className="text-center py-8 text-red-500 dark:text-red-400">
-                  <AlertCircle className="w-8 h-8 mx-auto mb-2" />
-                  <p>Failed to load SMS analytics</p>
-                </div>
+                <div className="text-center py-8 text-red-500">Failed to load analytics</div>
               ) : (
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
-                    <span className="text-gray-700 dark:text-gray-300 font-medium">Total SMS Sent</span>
-                    <span className="text-xl font-bold text-gray-900 dark:text-gray-100">{smsAnalytics?.total_sms_sent || 0}</span>
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-100 dark:border-gray-700">
+                    <span className="text-gray-600 dark:text-gray-300 font-medium">Total SMS Sent</span>
+                    <span className="text-lg font-bold text-gray-900 dark:text-white">{smsAnalytics?.total_sms_sent?.toLocaleString() || 0}</span>
                   </div>
-                  <div className="flex justify-between items-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                    <span className="text-blue-700 dark:text-blue-300 font-medium">Total Cost</span>
-                    <span className="text-xl font-bold text-blue-900 dark:text-blue-100">UGX {smsAnalytics?.total_cost || 0}</span>
+                  <div className="flex justify-between items-center p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-100 dark:border-gray-700">
+                    <span className="text-gray-600 dark:text-gray-300 font-medium">Total Cost</span>
+                    <span className="text-lg font-bold text-gray-900 dark:text-white">UGX {smsAnalytics?.total_cost?.toLocaleString() || 0}</span>
                   </div>
-                  <div className="flex justify-between items-center p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                  <div className="flex justify-between items-center p-4 bg-green-50 dark:bg-green-900/10 rounded-lg border border-green-100 dark:border-green-900/30">
                     <span className="text-green-700 dark:text-green-300 font-medium">Success Rate</span>
-                    <span className="text-xl font-bold text-green-900 dark:text-green-100">{smsAnalytics?.success_rate || 0}%</span>
+                    <span className="text-lg font-bold text-green-700 dark:text-green-300">{smsAnalytics?.failed_sms / smsAnalytics?.total_sms_sent * 100 || 0}%</span>
                   </div>
-                  <div className="flex justify-between items-center p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                    <span className="text-green-700 dark:text-green-300 font-medium">Successful SMS</span>
-                    <span className="text-xl font-bold text-green-900 dark:text-green-100">{smsAnalytics?.successful_sms || 0}</span>
-                  </div>
-                  <div className="flex justify-between items-center p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
-                    <span className="text-red-700 dark:text-red-300 font-medium">Failed SMS</span>
-                    <span className="text-xl font-bold text-red-900 dark:text-red-100">{smsAnalytics?.failed_sms || 0}</span>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="p-4 bg-green-50 dark:bg-green-900/10 rounded-lg border border-green-100 dark:border-green-900/30 text-center">
+                      <span className="block text-sm text-green-600 dark:text-green-400 mb-1">Successful</span>
+                      <span className="block text-xl font-bold text-green-700 dark:text-green-300">{smsAnalytics?.failed_sms?.toLocaleString() || 0}</span>
+                    </div>
+                    <div className="p-4 bg-red-50 dark:bg-red-900/10 rounded-lg border border-red-100 dark:border-red-900/30 text-center">
+                      <span className="block text-sm text-red-600 dark:text-red-400 mb-1">Failed</span>
+                      <span className="block text-xl font-bold text-red-700 dark:text-red-300">{smsAnalytics?.successful_sms?.toLocaleString() || 0}</span>
+                    </div>
                   </div>
                 </div>
               )}
             </div>
 
-            <div className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] p-6">
-              <h3 className="text-xl font-bold text-gray-900 dark:text-gray-200 mb-6">Top SMS Users</h3>
-              <div className="space-y-3">
+            {/* Top Users */}
+            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 p-6">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
+                <Users className="w-5 h-5 text-gray-500" />
+                Top SMS Users
+              </h3>
+              <div className="space-y-4">
                 {analyticsLoading ? (
-                  [...Array(3)].map((_, i) => (
-                    <div key={i} className="animate-pulse p-4 rounded-lg">
-                      <div className="flex justify-between">
-                        <div className="space-y-2">
-                          <div className="h-4 bg-gray-300 rounded w-32"></div>
-                          <div className="h-3 bg-gray-200 rounded w-24"></div>
-                        </div>
-                        <div className="space-y-2 text-right">
-                          <div className="h-4 bg-gray-300 rounded w-16"></div>
-                          <div className="h-3 bg-gray-200 rounded w-12"></div>
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                ) : analyticsError ? (
-                  <div className="text-center py-8 text-red-500">
-                    <AlertCircle className="w-8 h-8 mx-auto mb-2" />
-                    <p>Failed to load top users</p>
+                  <div className="space-y-4 animate-pulse">
+                    {[...Array(3)].map((_, i) => (
+                      <div key={i} className="h-16 bg-gray-100 dark:bg-gray-700 rounded-lg"></div>
+                    ))}
                   </div>
+                ) : analyticsError ? (
+                  <div className="text-center py-8 text-red-500">Failed to load top users</div>
                 ) : smsAnalytics?.top_users?.length > 0 ? (
                   smsAnalytics.top_users.map((user, index) => (
-                    <div key={user.user_id} className="flex items-center justify-between p-4 bg-gradient-to-r from-gray-100 to-blue-50 dark:from-gray-800/50 dark:to-blue-900/20 rounded-lg border border-gray-200 dark:border-gray-700 transition-shadow">
-                      <div className="flex items-center">
-                        <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold text-sm mr-3">
+                    <div key={user.user_id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/30 rounded-lg border border-gray-100 dark:border-gray-700">
+                      <div className="flex items-center gap-4">
+                        <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 rounded-full flex items-center justify-center font-bold text-sm">
                           {index + 1}
                         </div>
                         <div>
-                          <p className="font-medium text-gray-900 dark:text-gray-100">{user.full_name}</p>
-                          <p className="text-sm text-gray-500 dark:text-gray-400">{user.email}</p>
+                          <p className="font-medium text-gray-900 dark:text-white text-sm">{user.full_name}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">{user.email}</p>
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="text-lg font-bold text-blue-600 dark:text-blue-400">{user.sms_count}</p>
+                        <p className="text-sm font-bold text-gray-900 dark:text-white">{user.sms_count.toLocaleString()}</p>
                         <p className="text-xs text-gray-500 dark:text-gray-400">SMS sent</p>
                       </div>
                     </div>
                   ))
                 ) : (
-                  <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                    <Users className="w-8 h-8 mx-auto mb-2" />
+                  <div className="text-center py-12 text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-dashed border-gray-200 dark:border-gray-700">
+                    <Users className="w-8 h-8 mx-auto mb-2 opacity-50" />
                     <p>No top users data available</p>
                   </div>
                 )}
@@ -745,100 +705,91 @@ function UserServices() {
           </div>
 
           {/* Plan Distribution */}
-          <div className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] p-6">
-            <h3 className="text-xl font-bold text-gray-900 dark:text-gray-200 mb-6">Users by Plan</h3>
+          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 p-6">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-6">Users by Plan</h3>
             {statsLoading ? (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-pulse">
                 {[...Array(3)].map((_, i) => (
-                  <div key={i} className="animate-pulse text-center p-6 bg-gray-50 dark:bg-gray-800 rounded-xl">
-                    <div className="h-8 bg-gray-300 dark:bg-gray-600 rounded w-16 mx-auto mb-2"></div>
-                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-20 mx-auto"></div>
-                  </div>
+                  <div key={i} className="h-24 bg-gray-100 dark:bg-gray-700 rounded-xl"></div>
                 ))}
               </div>
             ) : statsError ? (
-              <div className="text-center py-8 text-red-500 dark:text-red-400">
-                <AlertCircle className="w-8 h-8 mx-auto mb-2" />
-                <p>Failed to load plan distribution</p>
-              </div>
+              <div className="text-center py-8 text-red-500">Failed to load plan distribution</div>
             ) : systemStats?.users_by_plan ? (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {Object.entries(systemStats.users_by_plan).map(([plan, count]) => (
-                  <div key={plan} className={`text-center p-6 rounded-xl border-2 hover:shadow-xl transition-shadow ${
-                    plan === 'Premium' ? 'bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 border-purple-200 dark:border-purple-700' :
-                    plan === 'Standard' ? 'bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 border-blue-200 dark:border-blue-700' :
-                    'bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800/20 dark:to-gray-700/20 border-gray-200 dark:border-gray-700'
-                  }`}>
-                    <div className={`text-3xl font-bold mb-2 ${
-                      plan === 'Premium' ? 'text-purple-600 dark:text-purple-400' :
-                      plan === 'Standard' ? 'text-blue-600 dark:text-blue-400' :
-                      'text-gray-600 dark:text-gray-400'
-                    }`}>
-                      {count as number}
-                    </div>
-                    <div className="text-sm font-medium text-gray-700 dark:text-gray-300">{plan}</div>
+                  <div key={plan} className="flex flex-col items-center justify-center p-6 rounded-xl border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/30">
+                    <span className="text-3xl font-bold text-gray-900 dark:text-white mb-2">{(count as number).toLocaleString()}</span>
+                    <span className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">{plan}</span>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                <Users className="w-8 h-8 mx-auto mb-2" />
-                <p>No plan data available</p>
-              </div>
+              <div className="text-center py-8 text-gray-500">No plan data available</div>
             )}
           </div>
-        </>
+        </div>
       )}
 
       {/* Topup Modal */}
       {showTopupModal && selectedUser && (
-        <div className="fixed inset-0 backdrop-blur-sm bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700 w-full max-w-md">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
-              Add Balance - {selectedUser.full_name}
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 w-full max-w-md">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
+              Add Balance
             </h3>
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Amount (UGX)
-              </label>
-              <input
-                type="number"
-                value={topupAmount}
-                onChange={(e) => setTopupAmount(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Enter amount"
-              />
-            </div>
-            <div className="flex justify-end space-x-3">
-              <Button
-                onClick={() => {
-                  setShowTopupModal(false);
-                  setSelectedUser(null);
-                  setTopupAmount('');
-                }}
-                variant="outline"
-                className="px-4 py-2"
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleTopup}
-                disabled={!topupAmount || topupMutation.isPending}
-                variant="primary"
-                className="px-4 py-2"
-              >
-                {topupMutation.isPending ? (
-                  <RefreshCw className="w-4 h-4 animate-spin mx-auto" />
-                ) : (
-                  'Add Balance'
-                )}
-              </Button>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+              Adding funds to <span className="font-medium text-gray-900 dark:text-white">{selectedUser.full_name}</span>'s wallet.
+            </p>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Amount (UGX)
+                </label>
+                <Input
+                  type="number"
+                  placeholder="Enter amount"
+                  value={topupAmount}
+                  onChange={(e) => setTopupAmount(e.target.value)}
+                  autoFocus
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <Button
+                  onClick={() => setShowTopupModal(false)}
+                  variant="outline"
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleTopup}
+                  disabled={!topupAmount || topupMutation.isPending}
+                  variant="primary"
+                  className="flex-1"
+                >
+                  {topupMutation.isPending ? (
+                    <LoadingSpinner />
+                  ) : (
+                    'Confirm Add'
+                  )}
+                </Button>
+              </div>
             </div>
           </div>
         </div>
       )}
+
+      <AlertDialog
+        isOpen={alertState.isOpen}
+        onClose={() => setAlertState(prev => ({ ...prev, isOpen: false }))}
+        title={alertState.title}
+        message={alertState.message}
+        type={alertState.type}
+      />
     </div>
-    </ComponentCard>
   );
 }
 

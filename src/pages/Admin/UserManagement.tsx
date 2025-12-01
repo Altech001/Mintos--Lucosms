@@ -1,7 +1,11 @@
-import { useCallback, useEffect, useState } from "react";
+
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import ComponentCard from "../../components/common/ComponentCard";
 import Input from "../../components/form/input/InputField";
 import Select from "../../components/form/Select";
 import Button from "../../components/ui/button/Button";
+import LoadingSpinner from "../../components/ui/LoadingSpinner";
 import Modal from "../../components/ui/modal/Modal";
 import Pagination from "../../components/ui/Pagination";
 import Skeleton from "../../components/ui/Skeleton";
@@ -10,20 +14,23 @@ import { UserCreate, UserPublic, UserUpdate } from "../../lib/api/models";
 import FundsModal from "./modals/FundsModal";
 import PlanModal from "./modals/PlanModal";
 import UserForm from "./UserForm";
-import ComponentCard from "../../components/common/ComponentCard";
 
 // API Base URL
-const API_BASE_URL = 'https://lucomintos.onrender.com/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_URL;
 
-// Get token from localStorage or context
-const getAuthToken = () => {
-  return localStorage.getItem('access_token') ;
+// Helper for headers
+const getHeaders = () => {
+  const token = localStorage.getItem('access_token');
+  return {
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json',
+  };
 };
 
 export default function UserManagementPage() {
   const { apiClient, user } = useAuth();
-  const [users, setUsers] = useState<UserPublic[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<UserPublic | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -31,174 +38,156 @@ export default function UserManagementPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all"); // all, active, inactive
   const [roleFilter, setRoleFilter] = useState("all"); // all, admin, user
-  const [isLoading, setIsLoading] = useState(true);
-  const [isMutating, setIsMutating] = useState<string | boolean>(false); // boolean for create, string for update/delete by user ID
+
   const [isFundsModalOpen, setIsFundsModalOpen] = useState(false);
   const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserPublic | null>(null);
 
-  const fetchUsers = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      // Fetch all users since API doesn't support server-side search
-      const response = await apiClient.api.users.usersReadUsers({ limit: 1000 }); // Adjust limit as needed
-      setUsers(response.data);
-    } catch (err) {
-      const anError = err as Error;
-      setError(anError.message || "Failed to fetch users.");
-    }
-    setIsLoading(false);
-  }, [apiClient]);
+  // Fetch users using React Query
+  const { data: users = [], isLoading, error } = useQuery({
+    queryKey: ['users-list'],
+    queryFn: async () => {
+      const response = await apiClient.api.users.usersReadUsers({ limit: 1000 });
+      return response.data;
+    },
+    enabled: !!user?.isSuperuser,
+  });
 
-  useEffect(() => {
-    if (user?.isSuperuser) {
-      fetchUsers();
-    }
-  }, [user, fetchUsers]);
+  // Mutations
+  const saveUserMutation = useMutation({
+    mutationFn: async (data: UserCreate | UserUpdate) => {
+      if (editingUser) {
+        return await apiClient.api.users.usersUpdateUser({ userId: editingUser.id, userUpdate: data as UserUpdate });
+      } else {
+        return await apiClient.api.users.usersCreateUser({ userCreate: data as UserCreate });
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users-list'] });
+      setIsModalOpen(false);
+      setEditingUser(null);
+    },
+  });
 
+  const deleteUserMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      return await apiClient.api.users.usersDeleteUser({ userId });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users-list'] });
+    },
+  });
+
+  const addFundsMutation = useMutation({
+    mutationFn: async ({ userId, amount }: { userId: string, amount: number }) => {
+      const response = await fetch(`${API_BASE_URL}/api/v1/admin/users/${userId}/add-balance`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({
+          user_id: userId,
+          amount,
+          description: 'Admin funds adjustment',
+          payment_method: 'admin_adjustment'
+        }),
+      });
+      if (!response.ok) throw new Error('Failed to add funds');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users-list'] });
+      setIsFundsModalOpen(false);
+    },
+  });
+
+  const deductFundsMutation = useMutation({
+    mutationFn: async ({ userId, amount, reason }: { userId: string, amount: number, reason: string }) => {
+      const response = await fetch(`${API_BASE_URL}/api/v1/admin/users/${userId}/deduct-balance`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({
+          user_id: userId,
+          amount,
+          reason,
+          payment_method: 'admin_deduction'
+        }),
+      });
+      if (!response.ok) throw new Error('Failed to deduct funds');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users-list'] });
+      setIsFundsModalOpen(false);
+    },
+  });
+
+  const changePlanMutation = useMutation({
+    mutationFn: async ({ userId, newPlan }: { userId: string, newPlan: string }) => {
+      const response = await fetch(`${API_BASE_URL}/api/v1/admin/users/${userId}/change-plan`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({
+          user_id: userId,
+          new_plan: newPlan
+        }),
+      });
+      if (!response.ok) throw new Error('Failed to change plan');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users-list'] });
+      setIsPlanModalOpen(false);
+    },
+  });
+
+  // Handlers
+  const handleSaveUser = (data: UserCreate | UserUpdate) => {
+    saveUserMutation.mutate(data);
+  };
+
+  const handleDeleteUser = (userId: string) => {
+    if (window.confirm("Are you sure you want to delete this user?")) {
+      deleteUserMutation.mutate(userId);
+    }
+  };
+
+  const handleAddFunds = (amount: number) => {
+    if (selectedUser) {
+      addFundsMutation.mutate({ userId: selectedUser.id, amount });
+    }
+  };
+
+  const handleDeductFunds = (amount: number, reason: string) => {
+    if (selectedUser) {
+      deductFundsMutation.mutate({ userId: selectedUser.id, amount, reason });
+    }
+  };
+
+  const handleChangePlan = (newPlan: string) => {
+    if (selectedUser) {
+      changePlanMutation.mutate({ userId: selectedUser.id, newPlan });
+    }
+  };
+
+  // Filtering
   const filteredUsers = users.filter(u => {
-    const searchMatch = 
+    const searchMatch =
       (u.fullName?.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (u.email.toLowerCase().includes(searchTerm.toLowerCase()));
 
-    const statusMatch = 
-      statusFilter === "all" || 
-      (statusFilter === "active" && u.isActive) || 
+    const statusMatch =
+      statusFilter === "all" ||
+      (statusFilter === "active" && u.isActive) ||
       (statusFilter === "inactive" && !u.isActive);
 
-    const roleMatch = 
-      roleFilter === "all" || 
-      (roleFilter === "admin" && u.isSuperuser) || 
+    const roleMatch =
+      roleFilter === "all" ||
+      (roleFilter === "admin" && u.isSuperuser) ||
       (roleFilter === "user" && !u.isSuperuser);
 
     return searchMatch && statusMatch && roleMatch;
   });
 
   const paginatedUsers = filteredUsers.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
-
-  const handleSaveUser = async (data: UserCreate | UserUpdate) => {
-    const mutationId = editingUser ? editingUser.id : true;
-    setIsMutating(mutationId);
-    try {
-      if (editingUser) {
-        await apiClient.api.users.usersUpdateUser({ userId: editingUser.id, userUpdate: data as UserUpdate });
-      } else {
-        await apiClient.api.users.usersCreateUser({ userCreate: data as UserCreate });
-      }
-      fetchUsers();
-      setIsModalOpen(false);
-      setEditingUser(null);
-    } catch (err) {
-      const anError = err as Error;
-      setError(anError.message || "Failed to save user.");
-    }
-    setIsMutating(false);
-  };
-
-  const handleAddFunds = async (amount: number) => {
-    if (!selectedUser) return;
-    setIsMutating(selectedUser.id);
-    try {
-      const response = await fetch(`${API_BASE_URL}/admin/users/${selectedUser.id}/add-balance`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${getAuthToken()}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          user_id: selectedUser.id,
-          amount,
-          description: 'Admin funds adjustment',
-          payment_method: 'admin_adjustment'
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to add funds');
-      }
-
-      fetchUsers();
-      setIsFundsModalOpen(false);
-    } catch (err) {
-      const anError = err as Error;
-      setError(anError.message || "Failed to add funds.");
-    }
-    setIsMutating(false);
-  };
-
-  const handleDeductFunds = async (amount: number, reason: string) => {
-    if (!selectedUser) return;
-    setIsMutating(selectedUser.id);
-    try {
-      const response = await fetch(`${API_BASE_URL}/admin/users/${selectedUser.id}/deduct-balance`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${getAuthToken()}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          user_id: selectedUser.id,
-          amount,
-          reason,
-          payment_method: 'admin_deduction'
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to deduct funds');
-      }
-
-      fetchUsers();
-      setIsFundsModalOpen(false);
-    } catch (err) {
-      const anError = err as Error;
-      setError(anError.message || "Failed to deduct funds.");
-    }
-    setIsMutating(false);
-  };
-
-  const handleChangePlan = async (newPlan: string) => {
-    if (!selectedUser) return;
-    setIsMutating(selectedUser.id);
-    try {
-      const response = await fetch(`${API_BASE_URL}/admin/users/${selectedUser.id}/change-plan`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${getAuthToken()}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          user_id: selectedUser.id,
-          new_plan: newPlan
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to change plan');
-      }
-
-      fetchUsers();
-      setIsPlanModalOpen(false);
-    } catch (err) {
-      const anError = err as Error;
-      setError(anError.message || "Failed to change plan.");
-    }
-    setIsMutating(false);
-  };
-
-  const handleDeleteUser = async (userId: string) => {
-    if (window.confirm("Are you sure you want to delete this user?")) {
-      setIsMutating(userId);
-      try {
-        await apiClient.api.users.usersDeleteUser({ userId });
-        fetchUsers();
-      } catch (err) {
-        const anError = err as Error;
-        setError(anError.message || "Failed to delete user.");
-      }
-      setIsMutating(false);
-    }
-  };
 
   if (!user?.isSuperuser) {
     return (
@@ -209,132 +198,134 @@ export default function UserManagementPage() {
   }
 
   return (
-
     <div className="p-4 sm:p-6">
       <ComponentCard title="User Management" desc="Manage users and other activities">
-      <div className="flex flex-col gap-4 mb-6 sm:flex-row sm:items-center sm:justify-between">
-        <div></div>
-        <div className="flex flex-wrap items-center gap-4">
-          <Input 
-            type="text"
-            placeholder="Search by name or email..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full sm:w-auto appearance-none "
-          />
-          <Select 
-            value={statusFilter} 
-            onChange={(value) => setStatusFilter(value)}
-            options={[
-              { value: "all", label: "All Statuses" },
-              { value: "active", label: "Active" },
-              { value: "inactive", label: "Inactive" }
-            ]}
-            className="w-full border border-gray-300 rounded-md shadow-sm sm:w-auto focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-          />
-          <select 
-            value={roleFilter} 
-            onChange={(e) => setRoleFilter(e.target.value)}
-            className=" appearance-none rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 pr-11 text-sm shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-          >
-            <option value="all">All Roles</option>
-            <option value="admin">Admin</option>
-            <option value="user">User</option>
-          </select>
-          <Button size="sm" onClick={() => { setEditingUser(null); setIsModalOpen(true); }}>Add User</Button>
+        <div className="flex flex-col gap-4 mb-6 sm:flex-row sm:items-center sm:justify-between">
+          <div></div>
+          <div className="flex flex-wrap items-center gap-4">
+            <Input
+              type="text"
+              placeholder="Search by name or email..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full sm:w-auto appearance-none"
+            />
+            <Select
+              value={statusFilter}
+              onChange={(value) => setStatusFilter(value)}
+              options={[
+                { value: "all", label: "All Statuses" },
+                { value: "active", label: "Active" },
+                { value: "inactive", label: "Inactive" }
+              ]}
+              className="w-full border border-gray-300 rounded-md shadow-sm sm:w-auto focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+            />
+            <select
+              value={roleFilter}
+              onChange={(e) => setRoleFilter(e.target.value)}
+              className="appearance-none rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 pr-11 text-sm shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+            >
+              <option value="all">All Roles</option>
+              <option value="admin">Admin</option>
+              <option value="user">User</option>
+            </select>
+            <Button size="sm" onClick={() => { setEditingUser(null); setIsModalOpen(true); }}>Add User</Button>
+          </div>
         </div>
-      </div>
-      
 
-      {error && <div className="p-4 mb-4 text-sm text-red-700 bg-red-100 rounded-lg dark:bg-red-200 dark:text-red-800">{error}</div>}
+        {error && (
+          <div className="p-4 mb-4 text-sm text-red-700 bg-red-100 rounded-lg dark:bg-red-200 dark:text-red-800">
+            {(error as Error).message || "Failed to fetch users."}
+          </div>
+        )}
 
-      <div className="overflow-x-auto bg-white rounded-lg dark:bg-gray-800">
-        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-          <thead className="bg-gray-50 dark:bg-gray-700">
-            <tr>
-              <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase dark:text-gray-300">Full Name</th>
-              <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase dark:text-gray-300">Email</th>
-              <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase dark:text-gray-300">Status</th>
-              <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase dark:text-gray-300">Role</th>
-              <th className="px-6 py-3 text-right text-xs font-medium tracking-wider text-gray-500 uppercase dark:text-gray-300">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-            {isLoading ? (
-              Array.from({ length: 5 }).map((_, index) => (
-                <tr key={index}>
-                  <td className="px-6 py-4"><Skeleton className="w-24 h-5" /></td>
-                  <td className="px-6 py-4"><Skeleton className="w-32 h-5" /></td>
-                  <td className="px-6 py-4"><Skeleton className="w-16 h-5" /></td>
-                  <td className="px-6 py-4"><Skeleton className="w-12 h-5" /></td>
-                  <td className="px-6 py-4"><Skeleton className="w-32 h-8" /></td>
-                </tr>
-              ))
-            ) : (
-              paginatedUsers.map((u) => (
-              <tr key={u.id}>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{u.fullName || 'N/A'}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">{u.email}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm">
-                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${u.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                    {u.isActive ? 'Active' : 'Inactive'}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">{u.isSuperuser ? 'Admin' : 'User'}</td>
-                <td className="px-6 py-4 text-sm font-medium text-right whitespace-nowrap">
-                  <Button variant="outline" size="sm" className="mr-2" onClick={() => { setEditingUser(u); setIsModalOpen(true); }}>Edit</Button>
-                  <Button variant="outline" size="sm" className="mr-2" onClick={() => { setSelectedUser(u); setIsFundsModalOpen(true); }}>Manage Funds</Button>
-                  <Button variant="outline" size="sm" className="mr-2" onClick={() => { setSelectedUser(u); setIsPlanModalOpen(true); }}>Change Plan</Button>
-                  <Button variant="danger" size="sm" onClick={() => handleDeleteUser(u.id)} isLoading={isMutating === u.id}>Delete</Button>
-                </td>
+        <div className="overflow-x-auto bg-white rounded-lg dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+            <thead className="bg-gray-50 dark:bg-gray-700">
+              <tr>
+                <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase dark:text-gray-300">Full Name</th>
+                <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase dark:text-gray-300">Email</th>
+                <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase dark:text-gray-300">Status</th>
+                <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase dark:text-gray-300">Role</th>
+                <th className="px-6 py-3 text-right text-xs font-medium tracking-wider text-gray-500 uppercase dark:text-gray-300">Actions</th>
               </tr>
-            )))
-          }
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+              {isLoading ? (
+                Array.from({ length: 5 }).map((_, index) => (
+                  <tr key={index}>
+                    <td className="px-6 py-4"><Skeleton className="w-24 h-5" /></td>
+                    <td className="px-6 py-4"><Skeleton className="w-32 h-5" /></td>
+                    <td className="px-6 py-4"><Skeleton className="w-16 h-5" /></td>
+                    <td className="px-6 py-4"><Skeleton className="w-12 h-5" /></td>
+                    <td className="px-6 py-4"><Skeleton className="w-32 h-8" /></td>
+                  </tr>
+                ))
+              ) : (
+                paginatedUsers.map((u) => (
+                  <tr key={u.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{u.fullName || 'N/A'}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">{u.email}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${u.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                        {u.isActive ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">{u.isSuperuser ? 'Admin' : 'User'}</td>
+                    <td className="px-6 py-4 text-sm font-medium text-right whitespace-nowrap">
+                      <Button variant="outline" size="sm" className="mr-2" onClick={() => { setEditingUser(u); setIsModalOpen(true); }}>Edit</Button>
+                      <Button variant="outline" size="sm" className="mr-2" onClick={() => { setSelectedUser(u); setIsFundsModalOpen(true); }}>Funds</Button>
+                      <Button variant="outline" size="sm" className="mr-2" onClick={() => { setSelectedUser(u); setIsPlanModalOpen(true); }}>Plan</Button>
+                      <Button variant="danger" size="sm" onClick={() => handleDeleteUser(u.id)} isLoading={deleteUserMutation.isPending && deleteUserMutation.variables === u.id}>Delete</Button>
+                    </td>
+                  </tr>
+                )))
+              }
+            </tbody>
+          </table>
+        </div>
 
-      <Pagination 
-        currentPage={currentPage} 
-        totalItems={filteredUsers.length} 
-        itemsPerPage={itemsPerPage} 
-        onPageChange={setCurrentPage} 
-      />
-
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingUser ? "Edit User" : "Add User"}>
-        <UserForm 
-          user={editingUser}
-          onSave={handleSaveUser} 
-          isLoading={typeof isMutating === 'boolean' ? isMutating : isMutating === editingUser?.id}
-          onCancel={() => {
-            setIsModalOpen(false);
-            setEditingUser(null);
-          }}
+        <Pagination
+          currentPage={currentPage}
+          totalItems={filteredUsers.length}
+          itemsPerPage={itemsPerPage}
+          onPageChange={setCurrentPage}
         />
-      </Modal>
 
-      {selectedUser && (
-        <>
-          <Modal isOpen={isFundsModalOpen} onClose={() => setIsFundsModalOpen(false)} title="Manage Funds">
-            <FundsModal 
-              user={selectedUser} 
-              onClose={() => setIsFundsModalOpen(false)} 
-              onAddFunds={handleAddFunds} 
-              onDeductFunds={handleDeductFunds} 
-              isMutating={isMutating === selectedUser.id}
-            />
-          </Modal>
+        <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingUser ? "Edit User" : "Add User"}>
+          <UserForm
+            user={editingUser}
+            onSave={handleSaveUser}
+            isLoading={saveUserMutation.isPending}
+            onCancel={() => {
+              setIsModalOpen(false);
+              setEditingUser(null);
+            }}
+          />
+        </Modal>
 
-          <Modal isOpen={isPlanModalOpen} onClose={() => setIsPlanModalOpen(false)} title="Change Plan">
-            <PlanModal 
-              user={selectedUser} 
-              onClose={() => setIsPlanModalOpen(false)} 
-              onChangePlan={handleChangePlan} 
-              isMutating={isMutating === selectedUser.id}
-            />
-          </Modal>
-        </>
-      )}
+        {selectedUser && (
+          <>
+            <Modal isOpen={isFundsModalOpen} onClose={() => setIsFundsModalOpen(false)} title={`Manage Funds - ${selectedUser.fullName}`}>
+              <FundsModal
+                user={selectedUser}
+                onClose={() => setIsFundsModalOpen(false)}
+                onAddFunds={handleAddFunds}
+                onDeductFunds={handleDeductFunds}
+                isMutating={addFundsMutation.isPending || deductFundsMutation.isPending}
+              />
+            </Modal>
+
+            <Modal isOpen={isPlanModalOpen} onClose={() => setIsPlanModalOpen(false)} title={`Change Plan - ${selectedUser.fullName}`}>
+              <PlanModal
+                user={selectedUser}
+                onClose={() => setIsPlanModalOpen(false)}
+                onChangePlan={handleChangePlan}
+                isMutating={changePlanMutation.isPending}
+              />
+            </Modal>
+          </>
+        )}
       </ComponentCard>
     </div>
   );
