@@ -126,6 +126,15 @@ const AppHeader: React.FC = () => {
           {/* Wallet and also plan */}
           <WalletButton />
         <LowBalanceAlert />
+        <Link to="https://chat.whatsapp.com/BC5YiZHV7zAJwY1cbCC6ii" target="_blank" className="hidden lg:block">
+        <img
+          className="hidden lg:block"
+          src="./images/chat/wap1.svg"
+          alt="Logo"
+          width={80}
+          height={80}
+        />
+        </Link>
         </div>
         <div
           className={`${

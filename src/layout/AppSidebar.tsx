@@ -1,5 +1,6 @@
 import {
   BanknoteArrowUpIcon,
+  EqualApproximatelyIcon,
   KeyRoundIcon,
   LayoutTemplate,
   MailIcon,
@@ -77,9 +78,9 @@ const othersItems: NavItem[] = [
     ],
   },
   {
-    name: "WhatsApp Message",
-    icon: <MessageCircleMore />,
-    path: "/whatsappmsg",
+    name: "Documentation",
+    icon: <EqualApproximatelyIcon />,
+    path: "/api_doc",
   },
 ];
 

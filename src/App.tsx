@@ -28,6 +28,7 @@ import SettingsPage from "./pages/Settings/SettingsPage";
 import ListTemplates from "./pages/Template/ListTemplates";
 import Tage from "./pages/Template/Tage";
 import Whatsapp from "./pages/UnderDev/Whatsapp";
+import ApiDoc from "./pages/Docs/Docs";
 
 export default function App() {
   return (
@@ -56,7 +57,7 @@ export default function App() {
               <Route path="/notifications" element={<Notifications />} />
               <Route path="/developer/api-keys" element={<ApiKeysPage />} />
               <Route path="/special-message" element={<SpecialMge />} />
-              {/* <Route path="/wap" element={<Subscribptions />} /> */}
+              <Route path="/api_doc" element={<ApiDoc />} />
             </Route>
           </Route>
 

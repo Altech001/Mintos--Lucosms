@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { DropdownItem } from "../ui/dropdown/DropdownItem";
 import { Dropdown } from "../ui/dropdown/Dropdown";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { Logs } from "lucide-react";
 import Modal from "../ui/modal/Modal";
@@ -146,7 +146,26 @@ export default function UserDropdown() {
                   fill=""
                 />
               </svg>
-              Support
+              Customer Support
+            </DropdownItem>
+          </li>
+          <li>
+            <DropdownItem
+              onItemClick={closeDropdown}
+              tag="a"
+              to="https://chat.whatsapp.com/BC5YiZHV7zAJwY1cbCC6ii"
+              
+              className="flex items-center gap-3 px-3 py-2 font-medium text-gray-700 rounded-lg group text-theme-sm hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300"
+            ><Link to="https://chat.whatsapp.com/BC5YiZHV7zAJwY1cbCC6ii" target="_blank" className="hidden lg:block">
+        <img
+          className="hidden lg:block"
+          src="./images/chat/wap1.svg"
+          alt="Logo"
+          width={34}
+          height={34}
+        />
+        </Link>              
+              Join WhatsApp Group
             </DropdownItem>
           </li>
         </ul>
