@@ -52,7 +52,7 @@ export default function SettingsPage() {
       setError(anError.message || "Failed to fetch plans.");
     }
     setIsLoadingPlans(false);
-  }, [apiClient]);
+  }, []);
 
   useEffect(() => {
     fetchPlans();
