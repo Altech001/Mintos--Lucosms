@@ -16,9 +16,12 @@
 import * as runtime from '../runtime';
 import type {
   HTTPValidationError,
+  LoginHistoryPublicList,
   Message,
+  SmsCostUpdate,
   UpdatePassword,
   UserCreate,
+  UserPhoneUpdate,
   UserPublic,
   UserRegister,
   UserUpdate,
@@ -28,12 +31,18 @@ import type {
 import {
     HTTPValidationErrorFromJSON,
     HTTPValidationErrorToJSON,
+    LoginHistoryPublicListFromJSON,
+    LoginHistoryPublicListToJSON,
     MessageFromJSON,
     MessageToJSON,
+    SmsCostUpdateFromJSON,
+    SmsCostUpdateToJSON,
     UpdatePasswordFromJSON,
     UpdatePasswordToJSON,
     UserCreateFromJSON,
     UserCreateToJSON,
+    UserPhoneUpdateFromJSON,
+    UserPhoneUpdateToJSON,
     UserPublicFromJSON,
     UserPublicToJSON,
     UserRegisterFromJSON,
@@ -54,6 +63,11 @@ export interface UsersDeleteUserRequest {
     userId: string;
 }
 
+export interface UsersReadLoginHistoryRequest {
+    skip?: number;
+    limit?: number;
+}
+
 export interface UsersReadUserByIdRequest {
     userId: string;
 }
@@ -67,6 +81,10 @@ export interface UsersRegisterUserRequest {
     userRegister: UserRegister;
 }
 
+export interface UsersResetUserSmsCostRequest {
+    userId: string;
+}
+
 export interface UsersUpdatePasswordMeRequest {
     updatePassword: UpdatePassword;
 }
@@ -78,6 +96,15 @@ export interface UsersUpdateUserRequest {
 
 export interface UsersUpdateUserMeRequest {
     userUpdateMe: UserUpdateMe;
+}
+
+export interface UsersUpdateUserPhoneRequest {
+    userPhoneUpdate: UserPhoneUpdate;
+}
+
+export interface UsersUpdateUserSmsCostRequest {
+    userId: string;
+    smsCostUpdate: SmsCostUpdate;
 }
 
 /**
@@ -133,6 +160,23 @@ export interface UsersApiInterface {
      * Delete User Me
      */
     usersDeleteUserMe(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Message>;
+
+    /**
+     * Retrieve login history for the current user.
+     * @summary Read Login History
+     * @param {number} [skip] 
+     * @param {number} [limit] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof UsersApiInterface
+     */
+    usersReadLoginHistoryRaw(requestParameters: UsersReadLoginHistoryRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<LoginHistoryPublicList>>;
+
+    /**
+     * Retrieve login history for the current user.
+     * Read Login History
+     */
+    usersReadLoginHistory(requestParameters: UsersReadLoginHistoryRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<LoginHistoryPublicList>;
 
     /**
      * Get a specific user by id.
@@ -199,6 +243,22 @@ export interface UsersApiInterface {
     usersRegisterUser(requestParameters: UsersRegisterUserRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<UserPublic>;
 
     /**
+     * Superadmin can reset a user\'s SMS cost back to default \'32\'.
+     * @summary Reset User Sms Cost
+     * @param {string} userId 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof UsersApiInterface
+     */
+    usersResetUserSmsCostRaw(requestParameters: UsersResetUserSmsCostRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<UserPublic>>;
+
+    /**
+     * Superadmin can reset a user\'s SMS cost back to default \'32\'.
+     * Reset User Sms Cost
+     */
+    usersResetUserSmsCost(requestParameters: UsersResetUserSmsCostRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<UserPublic>;
+
+    /**
      * Update own password.
      * @summary Update Password Me
      * @param {UpdatePassword} updatePassword 
@@ -246,6 +306,39 @@ export interface UsersApiInterface {
      * Update User Me
      */
     usersUpdateUserMe(requestParameters: UsersUpdateUserMeRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<UserPublic>;
+
+    /**
+     * Update own phone number.
+     * @summary Update User Phone
+     * @param {UserPhoneUpdate} userPhoneUpdate 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof UsersApiInterface
+     */
+    usersUpdateUserPhoneRaw(requestParameters: UsersUpdateUserPhoneRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<UserPublic>>;
+
+    /**
+     * Update own phone number.
+     * Update User Phone
+     */
+    usersUpdateUserPhone(requestParameters: UsersUpdateUserPhoneRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<UserPublic>;
+
+    /**
+     * Superadmin can update a user\'s SMS cost to any value (string stored on User.sms_cost).
+     * @summary Update User Sms Cost
+     * @param {string} userId 
+     * @param {SmsCostUpdate} smsCostUpdate 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof UsersApiInterface
+     */
+    usersUpdateUserSmsCostRaw(requestParameters: UsersUpdateUserSmsCostRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<UserPublic>>;
+
+    /**
+     * Superadmin can update a user\'s SMS cost to any value (string stored on User.sms_cost).
+     * Update User Sms Cost
+     */
+    usersUpdateUserSmsCost(requestParameters: UsersUpdateUserSmsCostRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<UserPublic>;
 
 }
 
@@ -377,6 +470,50 @@ export class UsersApi extends runtime.BaseAPI implements UsersApiInterface {
      */
     async usersDeleteUserMe(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Message> {
         const response = await this.usersDeleteUserMeRaw(initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Retrieve login history for the current user.
+     * Read Login History
+     */
+    async usersReadLoginHistoryRaw(requestParameters: UsersReadLoginHistoryRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<LoginHistoryPublicList>> {
+        const queryParameters: any = {};
+
+        if (requestParameters['skip'] != null) {
+            queryParameters['skip'] = requestParameters['skip'];
+        }
+
+        if (requestParameters['limit'] != null) {
+            queryParameters['limit'] = requestParameters['limit'];
+        }
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        if (this.configuration && this.configuration.accessToken) {
+            // oauth required
+            headerParameters["Authorization"] = await this.configuration.accessToken("OAuth2PasswordBearer", []);
+        }
+
+
+        let urlPath = `/api/v1/users/me/login-history`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => LoginHistoryPublicListFromJSON(jsonValue));
+    }
+
+    /**
+     * Retrieve login history for the current user.
+     * Read Login History
+     */
+    async usersReadLoginHistory(requestParameters: UsersReadLoginHistoryRequest = {}, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<LoginHistoryPublicList> {
+        const response = await this.usersReadLoginHistoryRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
@@ -546,6 +683,50 @@ export class UsersApi extends runtime.BaseAPI implements UsersApiInterface {
     }
 
     /**
+     * Superadmin can reset a user\'s SMS cost back to default \'32\'.
+     * Reset User Sms Cost
+     */
+    async usersResetUserSmsCostRaw(requestParameters: UsersResetUserSmsCostRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<UserPublic>> {
+        if (requestParameters['userId'] == null) {
+            throw new runtime.RequiredError(
+                'userId',
+                'Required parameter "userId" was null or undefined when calling usersResetUserSmsCost().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        if (this.configuration && this.configuration.accessToken) {
+            // oauth required
+            headerParameters["Authorization"] = await this.configuration.accessToken("OAuth2PasswordBearer", []);
+        }
+
+
+        let urlPath = `/api/v1/users/{user_id}/sms-cost/reset`;
+        urlPath = urlPath.replace(`{${"user_id"}}`, encodeURIComponent(String(requestParameters['userId'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => UserPublicFromJSON(jsonValue));
+    }
+
+    /**
+     * Superadmin can reset a user\'s SMS cost back to default \'32\'.
+     * Reset User Sms Cost
+     */
+    async usersResetUserSmsCost(requestParameters: UsersResetUserSmsCostRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<UserPublic> {
+        const response = await this.usersResetUserSmsCostRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
      * Update own password.
      * Update Password Me
      */
@@ -688,6 +869,106 @@ export class UsersApi extends runtime.BaseAPI implements UsersApiInterface {
      */
     async usersUpdateUserMe(requestParameters: UsersUpdateUserMeRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<UserPublic> {
         const response = await this.usersUpdateUserMeRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Update own phone number.
+     * Update User Phone
+     */
+    async usersUpdateUserPhoneRaw(requestParameters: UsersUpdateUserPhoneRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<UserPublic>> {
+        if (requestParameters['userPhoneUpdate'] == null) {
+            throw new runtime.RequiredError(
+                'userPhoneUpdate',
+                'Required parameter "userPhoneUpdate" was null or undefined when calling usersUpdateUserPhone().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+        if (this.configuration && this.configuration.accessToken) {
+            // oauth required
+            headerParameters["Authorization"] = await this.configuration.accessToken("OAuth2PasswordBearer", []);
+        }
+
+
+        let urlPath = `/api/v1/users/me/phone`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'PATCH',
+            headers: headerParameters,
+            query: queryParameters,
+            body: UserPhoneUpdateToJSON(requestParameters['userPhoneUpdate']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => UserPublicFromJSON(jsonValue));
+    }
+
+    /**
+     * Update own phone number.
+     * Update User Phone
+     */
+    async usersUpdateUserPhone(requestParameters: UsersUpdateUserPhoneRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<UserPublic> {
+        const response = await this.usersUpdateUserPhoneRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Superadmin can update a user\'s SMS cost to any value (string stored on User.sms_cost).
+     * Update User Sms Cost
+     */
+    async usersUpdateUserSmsCostRaw(requestParameters: UsersUpdateUserSmsCostRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<UserPublic>> {
+        if (requestParameters['userId'] == null) {
+            throw new runtime.RequiredError(
+                'userId',
+                'Required parameter "userId" was null or undefined when calling usersUpdateUserSmsCost().'
+            );
+        }
+
+        if (requestParameters['smsCostUpdate'] == null) {
+            throw new runtime.RequiredError(
+                'smsCostUpdate',
+                'Required parameter "smsCostUpdate" was null or undefined when calling usersUpdateUserSmsCost().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+        if (this.configuration && this.configuration.accessToken) {
+            // oauth required
+            headerParameters["Authorization"] = await this.configuration.accessToken("OAuth2PasswordBearer", []);
+        }
+
+
+        let urlPath = `/api/v1/users/{user_id}/sms-cost`;
+        urlPath = urlPath.replace(`{${"user_id"}}`, encodeURIComponent(String(requestParameters['userId'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'PATCH',
+            headers: headerParameters,
+            query: queryParameters,
+            body: SmsCostUpdateToJSON(requestParameters['smsCostUpdate']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => UserPublicFromJSON(jsonValue));
+    }
+
+    /**
+     * Superadmin can update a user\'s SMS cost to any value (string stored on User.sms_cost).
+     * Update User Sms Cost
+     */
+    async usersUpdateUserSmsCost(requestParameters: UsersUpdateUserSmsCostRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<UserPublic> {
+        const response = await this.usersUpdateUserSmsCostRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

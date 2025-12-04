@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useIdle, useDeviceOS, useBatteryStatus, useGeolocation } from 'react-haiku';
+import { LoginHistoryPublic } from '@/lib/api';
+import { apiClient } from '@/lib/api/client';
 
 // Mock ComponentCard - replace with your actual import
 const ComponentCard = ({ title, desc, children }: { title: string; desc: string; children: React.ReactNode }) => (
@@ -17,62 +19,41 @@ interface LocationData {
   country?: string;
 }
 
-interface LoginLog {
-  id: string;
-  date: string;
-  time: string;
-  os: string;
-  browser: string;
-  location: string;
-  ipAddress: string;
-}
-
 function ActivityLogs() {
   const isIdle = useIdle(5000);
   const deviceOS = useDeviceOS();
   const batteryStatus = useBatteryStatus();
   const geolocation = useGeolocation();
-  
+
   const [locationData, setLocationData] = useState<LocationData>({});
   const [locationLoading, setLocationLoading] = useState(false);
+  const [loginLogs, setLoginLogs] = useState<LoginHistoryPublic[]>([]);
+  const [loadingLogs, setLoadingLogs] = useState(false);
 
-  // Mock login logs data - Replace with actual API call
-  const [loginLogs] = useState<LoginLog[]>([
-    {
-      id: '1',
-      date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-      time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-      os: deviceOS || 'Unknown',
-      browser: 'Chrome 120',
-      location: 'Kampala, Uganda',
-      ipAddress: '192.168.1.1'
-    },
-    {
-      id: '2',
-      date: new Date(Date.now() - 86400000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-      time: new Date(Date.now() - 86400000).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-      os: 'Windows',
-      browser: 'Edge 119',
-      location: 'Kawempe, Uganda',
-      ipAddress: '192.168.1.2'
-    },
-    {
-      id: '3',
-      date: new Date(Date.now() - 172800000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-      time: new Date(Date.now() - 172800000).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-      os: 'macOS',
-      browser: 'Safari 17',
-      location: 'Ndeeba, Uganda',
-      ipAddress: '192.168.1.3'
-    }
-  ]);
+  useEffect(() => {
+    const fetchLogs = async () => {
+      setLoadingLogs(true);
+      try {
+        const response = await apiClient.api.users.usersReadLoginHistory({ limit: 10 });
+        if (response.data) {
+          setLoginLogs(response.data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch login logs:', error);
+      } finally {
+        setLoadingLogs(false);
+      }
+    };
+
+    fetchLogs();
+  }, []);
 
   // Fetch location name from coordinates
   useEffect(() => {
     if (!geolocation.latitude || !geolocation.longitude) return;
 
     let cancelled = false;
-    
+
     const fetchLocationName = async () => {
       setLocationLoading(true);
       try {
@@ -80,7 +61,7 @@ function ActivityLogs() {
           `https://nominatim.openstreetmap.org/reverse?lat=${geolocation.latitude}&lon=${geolocation.longitude}&format=json`
         );
         const data = await response.json();
-        
+
         if (!cancelled) {
           setLocationData({
             city: data.address?.city || data.address?.town || data.address?.village || 'Unknown',
@@ -103,16 +84,16 @@ function ActivityLogs() {
     };
   }, [geolocation.latitude, geolocation.longitude]);
 
-  const StatCard = ({ 
-    icon, 
-    label, 
-    value, 
-    subValue 
-  }: { 
-    icon: string; 
-    label: string; 
-    value: string; 
-    subValue?: string 
+  const StatCard = ({
+    icon,
+    label,
+    value,
+    subValue
+  }: {
+    icon: string;
+    label: string;
+    value: string;
+    subValue?: string
   }) => (
     <div className="group relative overflow-hidden rounded-lg bg-gray-50 dark:bg-gray-800 dark:to-gray-850 p-5 transition-all duration-200 hover:shadow-md">
       <div className="flex items-start justify-between">
@@ -140,15 +121,15 @@ function ActivityLogs() {
   const getLocationDisplay = () => {
     if (geolocation.loading || locationLoading) return 'Loading...';
     if (geolocation.error) return 'Unavailable';
-    
+
     if (locationData.city && locationData.country) {
       return `${locationData.city}, ${locationData.country}`;
     }
-    
+
     if (geolocation.latitude && geolocation.longitude) {
       return `${geolocation.latitude.toFixed(2)}°, ${geolocation.longitude.toFixed(2)}°`;
     }
-    
+
     return 'N/A';
   };
 
@@ -161,8 +142,8 @@ function ActivityLogs() {
 
   return (
     <div className="space-y-6">
-      <ComponentCard 
-        title="Activity Logs" 
+      <ComponentCard
+        title="Activity Logs"
         desc="Real-time monitoring of device status and user activity"
       >
         <div className="p-6">
@@ -205,8 +186,8 @@ function ActivityLogs() {
         </div>
       </ComponentCard>
 
-      <ComponentCard 
-        title="Login History" 
+      <ComponentCard
+        title="Login History"
         desc="Recent login activities and session information"
       >
         <div className="p-6">
@@ -235,12 +216,15 @@ function ActivityLogs() {
                 </tr>
               </thead>
               <tbody>
-                {loginLogs.map((log, index) => (
-                  <tr 
+                {loadingLogs ? (
+                  <tr>
+                    <td colSpan={6} className="py-4 text-center text-gray-500">Loading logs...</td>
+                  </tr>
+                ) : loginLogs.map((log, index) => (
+                  <tr
                     key={log.id}
-                    className={`border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors ${
-                      index === 0 ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''
-                    }`}
+                    className={`border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors ${index === 0 ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''
+                      }`}
                   >
                     <td className="py-4 px-4">
                       <div className="flex items-center gap-2">
@@ -250,35 +234,35 @@ function ActivityLogs() {
                           </span>
                         )}
                         <span className="text-sm font-medium text-gray-900 dark:text-white">
-                          {log.date}
+                          {new Date(log.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                         </span>
                       </div>
                     </td>
                     <td className="py-4 px-4">
                       <span className="text-sm text-gray-700 dark:text-gray-300">
-                        {log.time}
+                        {new Date(log.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
                       </span>
                     </td>
                     <td className="py-4 px-4">
                       <div className="flex items-center gap-2">
                         <span className="text-lg">
-                          {log.os.includes('Windows') ? '🪟' : log.os.includes('macOS') ? '🍎' : '💻'}
+                          {log.os?.includes('Windows') ? '🪟' : log.os?.includes('macOS') ? '🍎' : '💻'}
                         </span>
                         <span className="text-sm text-gray-700 dark:text-gray-300">
-                          {log.os}
+                          {log.os || 'Unknown'}
                         </span>
                       </div>
                     </td>
                     <td className="py-4 px-4">
                       <span className="text-sm text-gray-700 dark:text-gray-300">
-                        {log.browser}
+                        {log.browser || 'Unknown'}
                       </span>
                     </td>
                     <td className="py-4 px-4">
                       <div className="flex items-center gap-1.5">
                         <span className="text-sm">📍</span>
                         <span className="text-sm text-gray-700 dark:text-gray-300">
-                          {log.location}
+                          {log.location || 'Unknown'}
                         </span>
                       </div>
                     </td>
@@ -292,8 +276,8 @@ function ActivityLogs() {
               </tbody>
             </table>
           </div>
-          
-          {loginLogs.length === 0 && (
+
+          {!loadingLogs && loginLogs.length === 0 && (
             <div className="text-center py-12">
               <p className="text-gray-500 dark:text-gray-400">No login history available</p>
             </div>

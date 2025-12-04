@@ -1,8 +1,9 @@
 import { useState, useMemo } from "react";
 import Chart from "react-apexcharts";
 import { ApexOptions } from "apexcharts";
-import { useAuth } from "../../context/AuthContext";
 import { useQuery } from '@tanstack/react-query';
+import { apiClient } from "@/lib/api/client";
+import { SmsHistoryPublic } from "@/lib/api/models";
 
 type TimePeriod = 'daily' | 'weekly' | 'monthly';
 
@@ -14,37 +15,13 @@ interface SmsStats {
   pending: number;
 }
 
-interface SmsHistoryItem {
-  id: string;
-  to: string;
-  message: string;
-  status: string;
-  created_at: string;
-  delivered_at?: string;
-  from?: string;
-}
-
 export default function StatisticsChart() {
-  const { apiClient } = useAuth();
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('daily');
 
   // Fetch SMS history with caching
-  const fetchSmsHistory = async () => {
-    const token = apiClient.getToken();
-    if (!token) throw new Error('No auth token');
-
-    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-    // Fetch recent SMS history (adjust limit based on needs)
-    const response = await fetch(`${baseUrl}/api/v1/historysms/?skip=0&limit=1000`, {
-      headers: {
-        'accept': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-    });
-
-    if (!response.ok) throw new Error('Failed to fetch SMS history');
-    const data = await response.json();
-    return data.data || [];
+  const fetchSmsHistory = async (): Promise<SmsHistoryPublic[]> => {
+    const response = await apiClient.api.historySms.historysmsListMySmsHistory({ skip: 0, limit: 1000 });
+    return response.data;
   };
 
   const { data: smsHistory = [], isLoading } = useQuery({
@@ -56,12 +33,12 @@ export default function StatisticsChart() {
   });
 
   // Aggregate SMS history data based on time period
-  const aggregateSmsHistory = (period: TimePeriod, history: SmsHistoryItem[]): SmsStats[] => {
+  const aggregateSmsHistory = (period: TimePeriod, history: SmsHistoryPublic[]): SmsStats[] => {
     const now = new Date();
     const stats: SmsStats[] = [];
-    
+
     // Helper to get date key for grouping
-    const getDateKey = (dateStr: string, period: TimePeriod): string => {
+    const getDateKey = (dateStr: Date, period: TimePeriod): string => {
       const date = new Date(dateStr);
       if (period === 'daily') {
         return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -75,15 +52,15 @@ export default function StatisticsChart() {
 
     // Group SMS by date
     const grouped: Record<string, { sent: number; delivered: number; failed: number; pending: number }> = {};
-    
+
     history.forEach((sms) => {
-      const dateKey = getDateKey(sms.created_at, period);
+      const dateKey = getDateKey(sms.createdAt, period);
       if (!grouped[dateKey]) {
         grouped[dateKey] = { sent: 0, delivered: 0, failed: 0, pending: 0 };
       }
-      
+
       grouped[dateKey].sent++;
-      
+
       const status = sms.status?.toLowerCase() || '';
       if (status.includes('delivered') || status === 'success') {
         grouped[dateKey].delivered++;
@@ -302,7 +279,7 @@ export default function StatisticsChart() {
           <div className="h-[310px] bg-gray-200 dark:bg-gray-800 rounded-lg relative overflow-hidden">
             {/* Animated shimmer effect */}
             <div className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite] bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
-            
+
             {/* Fake chart lines */}
             <div className="absolute bottom-0 left-0 right-0 h-48 flex items-end justify-around px-8 pb-8">
               {[...Array(7)].map((_, i) => (
@@ -314,7 +291,7 @@ export default function StatisticsChart() {
               ))}
             </div>
           </div>
-          
+
           {/* Skeleton for legend */}
           <div className="flex justify-end gap-4 px-4">
             {[...Array(3)].map((_, i) => (

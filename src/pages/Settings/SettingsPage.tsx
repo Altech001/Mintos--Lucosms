@@ -1,13 +1,14 @@
 import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "../../context/AuthContext";
+import { apiClient } from "@/lib/api/client";
 import Button from "../../components/ui/button/Button";
-import { PlanInfo } from "../../lib/api/models";
+import { PlanInfo } from "@/lib/api/models";
 import Skeleton from "../../components/ui/Skeleton";
 import Input from "../../components/form/input/InputField";
 import { CheckCircle, User, Phone, FileText, Send } from "lucide-react";
 
 export default function SettingsPage() {
-  const { user, apiClient, checkAuth, logout } = useAuth();
+  const { user, checkAuth, logout } = useAuth();
   const [plans, setPlans] = useState<Record<string, PlanInfo>>({});
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -76,7 +77,7 @@ export default function SettingsPage() {
       setChangePlanError("Please provide a description.");
       return;
     }
-    
+
     // Show preview modal
     setChangePlanError(null);
     setIsChangePlanModalOpen(false);
@@ -86,14 +87,14 @@ export default function SettingsPage() {
   const handleSubmitForApproval = async () => {
     setIsSubmitting(true);
     setError(null);
-    
+
     try {
       // TODO: Add API call to submit plan change request for admin approval
       // This will be implemented when admin privileges are added
-      
+
       // Simulate submission
       await new Promise(resolve => setTimeout(resolve, 1000));
-      
+
       setMessage(`Plan change request submitted successfully! Your request to change to the ${selectedPlan} plan is pending admin approval.`);
       setIsPreviewModalOpen(false);
       setFullName("");
@@ -111,17 +112,17 @@ export default function SettingsPage() {
   const handleSaveLowBalanceThreshold = () => {
     setLowBalanceError(null);
     setLowBalanceSuccess(null);
-    
+
     const threshold = parseFloat(lowBalanceThreshold);
     if (isNaN(threshold) || threshold < 0) {
       setLowBalanceError("Please enter a valid amount.");
       return;
     }
-    
+
     localStorage.setItem('lowBalanceThreshold', lowBalanceThreshold);
     setLowBalanceSuccess(`Low balance alert set to ${threshold.toFixed(0)} UGX`);
     setIsLowBalanceModalOpen(false);
-    
+
     // Trigger a re-render of the header component by dispatching a custom event
     window.dispatchEvent(new Event('lowBalanceThresholdChanged'));
   };
@@ -202,24 +203,24 @@ export default function SettingsPage() {
           ))
         ) : (
           Object.values(plans).map((plan) => (
-          <div 
-            key={plan.planName} 
-            className={`p-6 border rounded-lg shadow-md cursor-pointer ${user?.planSub === plan.planName ? 'border-brand-500 bg-brand-50 dark:bg-brand-900/20' : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'}`}
-            onClick={() => setSelectedPlan(plan.planName)}
-          >
-            <h2 className="text-xl font-semibold text-gray-800 dark:text-white">{plan.planName}</h2>
-            <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">{plan.smsCost} <span className="text-sm font-normal">UGX/SMS</span></p>
-            <p className="mt-4 text-sm text-gray-600 dark:text-gray-400">{plan.description}</p>
-            <ul className="mt-6 space-y-2 text-sm text-gray-600 dark:text-gray-400">
-              {plan.features.map((feature) => (
-                <li key={feature} className="flex items-center gap-2">
-                  <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
-                  <span>{feature}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )))}
+            <div
+              key={plan.planName}
+              className={`p-6 border rounded-lg shadow-md cursor-pointer ${user?.planSub === plan.planName ? 'border-brand-500 bg-brand-50 dark:bg-brand-900/20' : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'}`}
+              onClick={() => setSelectedPlan(plan.planName)}
+            >
+              <h2 className="text-xl font-semibold text-gray-800 dark:text-white">{plan.planName}</h2>
+              <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">{plan.smsCost} <span className="text-sm font-normal">UGX/SMS</span></p>
+              <p className="mt-4 text-sm text-gray-600 dark:text-gray-400">{plan.description}</p>
+              <ul className="mt-6 space-y-2 text-sm text-gray-600 dark:text-gray-400">
+                {plan.features.map((feature) => (
+                  <li key={feature} className="flex items-center gap-2">
+                    <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
+                    <span>{feature}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )))}
       </div>
 
       {selectedPlan && (
@@ -282,7 +283,7 @@ export default function SettingsPage() {
             <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
               Fill in the details below to submit your plan change request for admin approval.
             </p>
-            
+
             {/* Plan Info Card */}
             <div className="mb-4 p-4 bg-brand-50 dark:bg-brand-900/20 rounded-lg border border-brand-200 dark:border-brand-800">
               <div className="flex justify-between items-center">
@@ -479,18 +480,18 @@ export default function SettingsPage() {
             </div>
 
             <div className="flex gap-3 mt-6">
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={() => {
                   setIsPreviewModalOpen(false);
                   setIsChangePlanModalOpen(true);
-                }} 
+                }}
                 className="flex-1"
                 disabled={isSubmitting}
               >
                 Back
               </Button>
-              <Button 
+              <Button
                 onClick={handleSubmitForApproval}
                 isLoading={isSubmitting}
                 disabled={isSubmitting}

@@ -3,14 +3,13 @@ import { Link } from "react-router-dom";
 import Button from "../../components/ui/button/Button";
 import Input from "../../components/form/input/InputField";
 import Label from "../../components/form/Label";
-import { useAuth } from "../../context/AuthContext";
+import { apiClient } from "../../lib/api/client";
 import { ChevronLeftIcon } from "lucide-react";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const { apiClient } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,6 +38,9 @@ export default function ForgotPasswordPage() {
         </Link>
       </div>
       <div className="flex flex-col justify-center flex-1 w-full max-w-md mx-auto">
+        <div>
+
+        </div>
         <div className="w-full">
           <div className="mb-5 sm:mb-8 text-center">
             <h1 className="mb-2 font-semibold text-gray-800 text-title-sm dark:text-white/90 sm:text-title-md">
@@ -56,7 +58,7 @@ export default function ForgotPasswordPage() {
                 </Label>
                 <Input
                   type="email"
-                  placeholder="info@gmail.com"
+                  placeholder="info@lucosms.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required

@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import Input from "../../components/form/input/InputField";
 import Label from "../../components/form/Label";
 import Button from "../../components/ui/button/Button";
-import { useAuth } from "../../context/AuthContext";
+import { apiClient } from "../../lib/api/client";
 
 export default function ResetPasswordPage() {
   const [password, setPassword] = useState("");
@@ -12,7 +12,6 @@ export default function ResetPasswordPage() {
   const [error, setError] = useState<string | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [searchParams] = useSearchParams();
-  const { apiClient } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -51,7 +50,7 @@ export default function ResetPasswordPage() {
       const anError = err as Error;
       setError(
         anError.message ||
-          "Failed to reset password. The link may have expired."
+        "Failed to reset password. The link may have expired."
       );
     }
   };

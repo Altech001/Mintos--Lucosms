@@ -1,12 +1,12 @@
 'use client';
 
 import {
-    ChevronDown,
-    ChevronUp,
-    Download,
-    MoreVertical,
-    Search,
-    X
+  ChevronDown,
+  ChevronUp,
+  Download,
+  MoreVertical,
+  Search,
+  X
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import PageBreadcrumb from "../../components/common/PageBreadCrumb";
@@ -22,28 +22,12 @@ import { useAuth } from '../../context/AuthContext';
 // ──────────────────────────────────────────────────────────────────────
 // Types
 // ──────────────────────────────────────────────────────────────────────
-interface Transaction {
-  id: string;
-  transaction_type: string;
-  amount: number;
-  currency: string;
-  description: string;
-  status: 'completed' | 'pending' | 'failed';
-  payment_method: string;
-  reference_number: string;
-  created_at: string;
-  updated_at: string;
-  user_id: string;
-  balance_before: number | null;
-  balance_after: number | null;
-}
+import { TransactionPublic } from '@/lib/api/models';
+import { apiClient } from '@/lib/api/client';
 
-interface TransactionsResponse {
-  data: Transaction[];
-  count: number;
-}
+// Local interfaces removed, using TransactionPublic
 
-type SortKey = 'reference_number' | 'description' | 'amount' | 'created_at' | 'status';
+type SortKey = 'referenceNumber' | 'description' | 'amount' | 'createdAt' | 'status';
 type SortOrder = 'asc' | 'desc';
 
 
@@ -53,32 +37,21 @@ type SortOrder = 'asc' | 'desc';
 // ──────────────────────────────────────────────────────────────────────
 export default function Transactions() {
   // Auth + admin flag
-  const { user, apiClient } = useAuth();
+  const { user } = useAuth();
   const isAdmin = !!user?.isSuperuser;
 
   // Data fetcher
-  const fetchTransactions = async (): Promise<Transaction[]> => {
-    const token = apiClient.getToken();
-    if (!token) return [];
+  const fetchTransactions = async (): Promise<TransactionPublic[]> => {
+    try {
+      const response = isAdmin
+        ? await apiClient.api.transactions.transactionsListAllTransactions({ skip: 0, limit: 50 })
+        : await apiClient.api.transactions.transactionsListMyTransactions({ skip: 0, limit: 50 });
 
-    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-    const endpoint = isAdmin 
-      ? `${baseUrl}/api/v1/transactions/all?skip=0&limit=50`
-      : `${baseUrl}/api/v1/transactions/?skip=0&limit=50`;
-
-    const response = await fetch(endpoint, {
-      headers: {
-        'accept': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to fetch transactions');
+      return response.data;
+    } catch (error) {
+      console.error('Failed to fetch transactions:', error);
+      return [];
     }
-
-    const result: TransactionsResponse = await response.json();
-    return result.data;
   };
 
   const { data: transactions = [], isLoading: isTxLoading } = useQuery({
@@ -118,12 +91,12 @@ export default function Transactions() {
     if (searchTerm) {
       const searchLower = searchTerm.toLowerCase();
       filtered = filtered.filter(t =>
-        (t.reference_number?.toLowerCase() || '').includes(searchLower) ||
+        (t.referenceNumber?.toLowerCase() || '').includes(searchLower) ||
         (t.description?.toLowerCase() || '').includes(searchLower) ||
-        (t.transaction_type?.toLowerCase() || '').includes(searchLower) ||
-        (t.payment_method?.toLowerCase() || '').includes(searchLower) ||
+        (t.transactionType?.toLowerCase() || '').includes(searchLower) ||
+        (t.paymentMethod?.toLowerCase() || '').includes(searchLower) ||
         t.amount.toString().includes(searchLower) ||
-        t.currency.toLowerCase().includes(searchLower)
+        (t.currency || '').toLowerCase().includes(searchLower)
       );
     }
 
@@ -132,9 +105,9 @@ export default function Transactions() {
       const now = new Date();
       const daysAgo = dateFilter === 'last10' ? 10 : 30;
       const cutoffDate = new Date(now.getTime() - daysAgo * 24 * 60 * 60 * 1000);
-      
+
       filtered = filtered.filter(t => {
-        const transactionDate = new Date(t.created_at);
+        const transactionDate = new Date(t.createdAt);
         return transactionDate >= cutoffDate;
       });
     }
@@ -190,14 +163,14 @@ export default function Transactions() {
   const exportCSV = () => {
     const headers = ['Reference', 'Type', 'Description', 'Amount', 'Currency', 'Date', 'Status', 'Payment Method'];
     const rows = sortedAndFiltered.map(t => [
-      t.reference_number,
-      t.transaction_type,
+      t.referenceNumber,
+      t.transactionType,
       t.description,
       t.amount.toFixed(2),
       t.currency,
-      new Date(t.created_at).toLocaleDateString(),
-      t.status.charAt(0).toUpperCase() + t.status.slice(1),
-      t.payment_method,
+      new Date(t.createdAt).toLocaleDateString(),
+      (t.status || '').charAt(0).toUpperCase() + (t.status || '').slice(1),
+      t.paymentMethod,
     ]);
     const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
@@ -318,23 +291,23 @@ export default function Transactions() {
               <thead className="text-xs text-gray-500 uppercase border-b border-gray-200 dark:border-white/10">
                 <tr>
                   <th className="px-6 py-3">
-                  <Checkbox
-                    checked={selectedIds.length === paginated.length && paginated.length > 0}
-                    onChange={toggleSelectAll}
-                    className="w-4 h-4 rounded border-gray-300 dark:border-gray-600"
+                    <Checkbox
+                      checked={selectedIds.length === paginated.length && paginated.length > 0}
+                      onChange={toggleSelectAll}
+                      className="w-4 h-4 rounded border-gray-300 dark:border-gray-600"
                     />
                   </th>
-                  {(['reference_number', 'description', 'amount', 'created_at', 'status'] as const).map(key => (
+                  {(['referenceNumber', 'description', 'amount', 'createdAt', 'status'] as const).map(key => (
                     <th
                       key={key}
                       onClick={() => handleSort(key)}
                       className="px-6 py-3 font-medium cursor-pointer hover:text-gray-900 dark:hover:text-white transition-colors"
                     >
                       <div className="flex items-center gap-1">
-                        {key === 'reference_number' && 'Reference Number'}
+                        {key === 'referenceNumber' && 'Reference Number'}
                         {key === 'description' && 'Description'}
                         {key === 'amount' && 'Amount'}
-                        {key === 'created_at' && 'Date'}
+                        {key === 'createdAt' && 'Date'}
                         {key === 'status' && 'Status'}
                         {sortKey === key && (
                           sortOrder === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
@@ -353,16 +326,16 @@ export default function Transactions() {
                   >
                     <td className="px-6 py-4">
                       <Checkbox
-                    checked={selectedIds.includes(t.id)}
-                    onChange={() => toggleSelect(t.id)}
-                    className="w-4 h-4 rounded border-gray-300 dark:border-gray-600"
-                    />
+                        checked={selectedIds.includes(t.id)}
+                        onChange={() => toggleSelect(t.id)}
+                        className="w-4 h-4 rounded border-gray-300 dark:border-gray-600"
+                      />
                     </td>
                     <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">
-                      {t.reference_number || 'N/A'}
+                      {t.referenceNumber || 'N/A'}
                     </td>
                     <td className="px-6 py-4 text-gray-600 dark:text-gray-300">
-                      <div className="max-w-xs truncate" title={t.description}>
+                      <div className="max-w-xs truncate" title={t.description || ''}>
                         {t.description || 'No description'}
                       </div>
                     </td>
@@ -370,10 +343,10 @@ export default function Transactions() {
                       {t.currency} {t.amount.toFixed(2)}
                     </td>
                     <td className="px-6 py-4 text-gray-600 dark:text-gray-300">
-                      {new Date(t.created_at).toLocaleDateString('en-US', { 
-                        year: 'numeric', 
-                        month: 'short', 
-                        day: 'numeric' 
+                      {new Date(t.createdAt).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric'
                       })}
                     </td>
                     <td className="px-6 py-4">
@@ -381,10 +354,10 @@ export default function Transactions() {
                         size="sm"
                         color={
                           t.status === 'completed' ? 'success' :
-                          t.status === 'pending' ? 'warning' : 'error'
+                            t.status === 'pending' ? 'warning' : 'error'
                         }
                       >
-                        {t.status.charAt(0).toUpperCase() + t.status.slice(1)}
+                        {(t.status || '').charAt(0).toUpperCase() + (t.status || '').slice(1)}
                       </Badge>
                     </td>
                     <td className="px-6 py-4 relative">
@@ -403,7 +376,7 @@ export default function Transactions() {
                         <div className="absolute right-0 top-10 z-50 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-white/10">
                           <button
                             onClick={() => {
-                              alert(`Transaction Details:\n\nID: ${t.id}\nType: ${t.transaction_type}\nAmount: ${t.currency} ${t.amount}\nMethod: ${t.payment_method}\nReference: ${t.reference_number}\nBalance Before: ${t.balance_before}\nBalance After: ${t.balance_after}`);
+                              alert(`Transaction Details:\n\nID: ${t.id}\nType: ${t.transactionType}\nAmount: ${t.currency} ${t.amount}\nMethod: ${t.paymentMethod}\nReference: ${t.referenceNumber}\nBalance Before: ${t.balanceBefore}\nBalance After: ${t.balanceAfter}`);
                               setShowActions(null);
                             }}
                             className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5 rounded-t-lg"
@@ -491,20 +464,11 @@ export default function Transactions() {
                 size="md"
                 onClick={async () => {
                   try {
-                    const token = apiClient.getToken();
-                    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-                    
                     // Delete all selected transactions
                     const deletePromises = selectedIds.map(id =>
-                      fetch(`${baseUrl}/api/v1/transactions/${id}`, {
-                        method: 'DELETE',
-                        headers: {
-                          'accept': 'application/json',
-                          'Authorization': `Bearer ${token}`,
-                        },
-                      })
+                      apiClient.api.transactions.transactionsDeleteTransaction({ transactionId: id })
                     );
-                    
+
                     await Promise.all(deletePromises);
                     alert(`${selectedIds.length} transaction(s) deleted successfully`);
                     setSelectedIds([]);
@@ -556,22 +520,10 @@ export default function Transactions() {
                 onClick={async () => {
                   if (!showDeleteModal) return;
                   try {
-                    const token = apiClient.getToken();
-                    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-                    const response = await fetch(`${baseUrl}/api/v1/transactions/${showDeleteModal}`, {
-                      method: 'DELETE',
-                      headers: {
-                        'accept': 'application/json',
-                        'Authorization': `Bearer ${token}`,
-                      },
-                    });
-                    if (response.ok) {
-                      alert('Transaction deleted successfully');
-                      // Refetch transactions
-                      window.location.reload();
-                    } else {
-                      alert('Failed to delete transaction');
-                    }
+                    await apiClient.api.transactions.transactionsDeleteTransaction({ transactionId: showDeleteModal });
+                    alert('Transaction deleted successfully');
+                    // Refetch transactions
+                    window.location.reload();
                   } catch {
                     alert('Error deleting transaction');
                   }

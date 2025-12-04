@@ -66,6 +66,12 @@ export interface UserCreate {
      * @type {string}
      * @memberof UserCreate
      */
+    phone?: string | null;
+    /**
+     * 
+     * @type {string}
+     * @memberof UserCreate
+     */
     password: string;
 }
 
@@ -95,6 +101,7 @@ export function UserCreateFromJSONTyped(json: any, ignoreDiscriminator: boolean)
         'planSub': json['plan_sub'] == null ? undefined : json['plan_sub'],
         'wallet': json['wallet'] == null ? undefined : json['wallet'],
         'smsCost': json['sms_cost'] == null ? undefined : json['sms_cost'],
+        'phone': json['phone'] == null ? undefined : json['phone'],
         'password': json['password'],
     };
 }
@@ -117,6 +124,7 @@ export function UserCreateToJSONTyped(value?: UserCreate | null, ignoreDiscrimin
         'plan_sub': value['planSub'],
         'wallet': value['wallet'],
         'sms_cost': value['smsCost'],
+        'phone': value['phone'],
         'password': value['password'],
     };
 }

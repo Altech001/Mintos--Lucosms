@@ -5,6 +5,7 @@ import { ScrollToTop } from "./components/common/ScrollToTop";
 import AppLayout from "./layout/AppLayout";
 import PromoCodeManagementPage from "./pages/Admin/PromoCodeManagement";
 import UserManagementPage from "./pages/Admin/UserManagement";
+import UserServices from "./pages/Admin/UserServices";
 import ForgotPasswordPage from "./pages/AuthPages/ForgotPassword";
 import ResetPasswordPage from "./pages/AuthPages/ResetPasswordPage";
 import SignIn from "./pages/AuthPages/SignIn";
@@ -12,6 +13,7 @@ import SignUp from "./pages/AuthPages/SignUp";
 import ContactGroups from "./pages/Contacts/ContactGroups";
 import ComposePage from "./pages/Dashboard/Compose";
 import Home from "./pages/Dashboard/Home";
+import SpecialMge from "./pages/Dashboard/SpecialMge";
 import ApiKeysPage from "./pages/Developer/ApiKeysPage";
 import AutoTopUp from "./pages/Extension/Autotopup";
 import Developer from "./pages/Extension/Developers";
@@ -26,8 +28,6 @@ import SettingsPage from "./pages/Settings/SettingsPage";
 import ListTemplates from "./pages/Template/ListTemplates";
 import Tage from "./pages/Template/Tage";
 import Whatsapp from "./pages/UnderDev/Whatsapp";
-import UserServices from "./pages/Admin/UserServices";
-import SpecialMge from "./pages/Dashboard/SpecialMge";
 
 export default function App() {
   return (
@@ -56,6 +56,7 @@ export default function App() {
               <Route path="/notifications" element={<Notifications />} />
               <Route path="/developer/api-keys" element={<ApiKeysPage />} />
               <Route path="/special-message" element={<SpecialMge />} />
+              {/* <Route path="/wap" element={<Subscribptions />} /> */}
             </Route>
           </Route>
 

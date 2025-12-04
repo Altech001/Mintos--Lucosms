@@ -1,7 +1,6 @@
 import { BoltIcon, BoxesIcon, PackageOpen } from "lucide-react";
 import Badge from "../ui/badge/Badge";
 import { useQuery } from '@tanstack/react-query';
-import { useAuth } from '../../context/AuthContext';
 
 interface SmsHistoryItem {
   id: string;
@@ -18,27 +17,19 @@ interface UserProfile {
   sms_cost: string;
 }
 
+import { apiClient } from "@/lib/api/client";
+
 export default function EcommerceMetrics() {
-  const { apiClient } = useAuth();
+  // const { apiClient } = useAuth(); // apiClient is not in AuthContext
 
   // Fetch SMS history for accurate statistics
   const { data: smsHistory = [] } = useQuery<SmsHistoryItem[]>({
     queryKey: ['smsHistoryMetrics'],
     queryFn: async () => {
-      const token = apiClient.getToken();
-      if (!token) throw new Error('No auth token');
-
-      const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-      const response = await fetch(`${baseUrl}/api/v1/historysms/?skip=0&limit=1000`, {
-        headers: {
-          'accept': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) throw new Error('Failed to fetch SMS history');
-      const result = await response.json();
-      return result.data || [];
+      const response = await apiClient.api.historySms.historysmsListMySmsHistory({ skip: 0, limit: 1000 });
+      // Map the API response to the local interface if needed, or use the API model directly.
+      // The API returns { data: [...], count: ... }
+      return response.data as unknown as SmsHistoryItem[];
     },
     staleTime: 30_000,
     refetchOnWindowFocus: false,
@@ -48,19 +39,13 @@ export default function EcommerceMetrics() {
   const { data: userProfile } = useQuery<UserProfile>({
     queryKey: ['userProfile'],
     queryFn: async () => {
-      const token = apiClient.getToken();
-      if (!token) throw new Error('No auth token');
-
-      const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-      const response = await fetch(`${baseUrl}/api/v1/user-data/profile`, {
-        headers: {
-          'accept': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) throw new Error('Failed to fetch profile');
-      return response.json();
+      const response = await apiClient.api.userData.userDataGetUserProfile();
+      // Map the API response to the local interface
+      return {
+        plan: response.planSub,
+        wallet_balance: response.wallet,
+        sms_cost: response.smsCost,
+      };
     },
     staleTime: 60_000,
     refetchOnWindowFocus: false,
@@ -73,7 +58,7 @@ export default function EcommerceMetrics() {
   const totalEnqueued = smsHistory.filter(
     (sms) => sms.status === 'pending' || sms.delivery_status === 'pending'
   ).length;
-  const currentPlan = userProfile?.plan ;
+  const currentPlan = userProfile?.plan;
   const availablePlans = ['Basic', 'Standard', 'Premium', 'Enterprise'];
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 md:gap-6">
@@ -98,7 +83,7 @@ export default function EcommerceMetrics() {
         </div>
       </div>
       {/* <!-- Metric Item End --> */}
-      
+
 
       {/* <!-- Metric Item Start --> */}
       <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
@@ -137,8 +122,8 @@ export default function EcommerceMetrics() {
             <span className="text-xs text-gray-500 dark:text-gray-400">Available Plans:</span>
             <div className="flex flex-wrap gap-1">
               {availablePlans.map((plan) => (
-                <Badge 
-                  key={plan} 
+                <Badge
+                  key={plan}
                   color={plan === currentPlan ? 'success' : 'warning'}
                   size="sm"
                 >

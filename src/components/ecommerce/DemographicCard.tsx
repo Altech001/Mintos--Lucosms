@@ -6,13 +6,8 @@ import CountryMap from "./CountryMap";
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../context/AuthContext';
 
-interface SmsHistory {
-  id: string;
-  recipient: string;
-  message: string;
-  status: string;
-  created_at: string;
-}
+import { apiClient } from '@/lib/api/client';
+import { SmsHistoryPublic } from '@/lib/api/models';
 
 interface NetworkStats {
   name: string;
@@ -22,7 +17,7 @@ interface NetworkStats {
 }
 
 export default function DemographicCard() {
-  const { apiClient } = useAuth();
+  const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
 
   function toggleDropdown() {
@@ -34,24 +29,13 @@ export default function DemographicCard() {
   }
 
   // Fetch SMS history
-  const { data: smsHistory = [] } = useQuery<SmsHistory[]>({
-    queryKey: ['smsHistoryDemographics'],
+  const { data: smsHistory = [] } = useQuery<SmsHistoryPublic[]>({
+    queryKey: ['smsHistoryDemographics', user?.id],
     queryFn: async () => {
-      const token = apiClient.getToken();
-      if (!token) throw new Error('No auth token');
-
-      const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-      const response = await fetch(`${baseUrl}/api/v1/historysms/?skip=0&limit=1000`, {
-        headers: {
-          'accept': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) throw new Error('Failed to fetch SMS history');
-      const result = await response.json();
-      return result.data || [];
+      const response = await apiClient.api.historySms.historysmsListMySmsHistory({ skip: 0, limit: 1000 });
+      return response.data;
     },
+    enabled: !!user,
     staleTime: 30_000,
     refetchOnWindowFocus: false,
   });
@@ -71,7 +55,7 @@ export default function DemographicCard() {
 
     smsHistory.forEach((sms) => {
       const recipient = sms.recipient.replace(/[^0-9]/g, ''); // Remove non-numeric characters
-      
+
       // Check Airtel prefixes
       if (airtelPrefixes.some(prefix => recipient.startsWith(prefix))) {
         airtelCount++;
@@ -189,7 +173,7 @@ export default function DemographicCard() {
 
               <div className="flex w-full max-w-[140px] items-center gap-3">
                 <div className="relative block h-2 w-full max-w-[100px] rounded-sm bg-gray-200 dark:bg-gray-800">
-                  <div 
+                  <div
                     className="absolute left-0 top-0 flex h-full items-center justify-center rounded-sm bg-brand-500 text-xs font-medium text-white"
                     style={{ width: `${network.percentage}%` }}
                   ></div>

@@ -5,30 +5,18 @@ import ComponentCard from "../../components/common/ComponentCard";
 import Input from "../../components/form/input/InputField";
 import Select from "../../components/form/Select";
 import Button from "../../components/ui/button/Button";
-import LoadingSpinner from "../../components/ui/LoadingSpinner";
 import Modal from "../../components/ui/modal/Modal";
 import Pagination from "../../components/ui/Pagination";
 import Skeleton from "../../components/ui/Skeleton";
 import { useAuth } from "../../context/AuthContext";
-import { UserCreate, UserPublic, UserUpdate } from "../../lib/api/models";
+import { apiClient } from "@/lib/api/client";
+import { UserCreate, UserPublic, UserUpdate } from "@/lib/api/models";
 import FundsModal from "./modals/FundsModal";
 import PlanModal from "./modals/PlanModal";
 import UserForm from "./UserForm";
 
-// API Base URL
-const API_BASE_URL = import.meta.env.VITE_API_URL;
-
-// Helper for headers
-const getHeaders = () => {
-  const token = localStorage.getItem('access_token');
-  return {
-    'Authorization': `Bearer ${token}`,
-    'Content-Type': 'application/json',
-  };
-};
-
 export default function UserManagementPage() {
-  const { apiClient, user } = useAuth();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -79,19 +67,15 @@ export default function UserManagementPage() {
   });
 
   const addFundsMutation = useMutation({
-    mutationFn: async ({ userId, amount }: { userId: string, amount: number }) => {
-      const response = await fetch(`${API_BASE_URL}/api/v1/admin/users/${userId}/add-balance`, {
-        method: 'POST',
-        headers: getHeaders(),
-        body: JSON.stringify({
-          user_id: userId,
+    mutationFn: async ({ userId, amount, reason }: { userId: string, amount: number, reason?: string }) => {
+      return await apiClient.api.userData.userDataAdminAddFundsToWallet({
+        userId,
+        addFundsRequest: {
           amount,
-          description: 'Admin funds adjustment',
-          payment_method: 'admin_adjustment'
-        }),
+          referenceNumber: reason || 'Admin funds adjustment',
+          paymentMethod: 'admin_adjustment'
+        }
       });
-      if (!response.ok) throw new Error('Failed to add funds');
-      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users-list'] });
@@ -101,18 +85,13 @@ export default function UserManagementPage() {
 
   const deductFundsMutation = useMutation({
     mutationFn: async ({ userId, amount, reason }: { userId: string, amount: number, reason: string }) => {
-      const response = await fetch(`${API_BASE_URL}/api/v1/admin/users/${userId}/deduct-balance`, {
-        method: 'POST',
-        headers: getHeaders(),
-        body: JSON.stringify({
-          user_id: userId,
+      return await apiClient.api.userData.userDataAdminDeductFundsFromWallet({
+        userId,
+        deductFundsRequest: {
           amount,
-          reason,
-          payment_method: 'admin_deduction'
-        }),
+          reason
+        }
       });
-      if (!response.ok) throw new Error('Failed to deduct funds');
-      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users-list'] });
@@ -122,16 +101,12 @@ export default function UserManagementPage() {
 
   const changePlanMutation = useMutation({
     mutationFn: async ({ userId, newPlan }: { userId: string, newPlan: string }) => {
-      const response = await fetch(`${API_BASE_URL}/api/v1/admin/users/${userId}/change-plan`, {
-        method: 'POST',
-        headers: getHeaders(),
-        body: JSON.stringify({
-          user_id: userId,
-          new_plan: newPlan
-        }),
+      return await apiClient.api.userData.userDataAdminChangePlan({
+        userId,
+        changePlanRequest: {
+          newPlan
+        }
       });
-      if (!response.ok) throw new Error('Failed to change plan');
-      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users-list'] });
@@ -150,21 +125,21 @@ export default function UserManagementPage() {
     }
   };
 
-  const handleAddFunds = (amount: number) => {
+  const handleAddFunds = async (amount: number, reason: string) => {
     if (selectedUser) {
-      addFundsMutation.mutate({ userId: selectedUser.id, amount });
+      await addFundsMutation.mutateAsync({ userId: selectedUser.id, amount, reason });
     }
   };
 
-  const handleDeductFunds = (amount: number, reason: string) => {
+  const handleDeductFunds = async (amount: number, reason: string) => {
     if (selectedUser) {
-      deductFundsMutation.mutate({ userId: selectedUser.id, amount, reason });
+      await deductFundsMutation.mutateAsync({ userId: selectedUser.id, amount, reason });
     }
   };
 
-  const handleChangePlan = (newPlan: string) => {
+  const handleChangePlan = async (newPlan: string) => {
     if (selectedUser) {
-      changePlanMutation.mutate({ userId: selectedUser.id, newPlan });
+      await changePlanMutation.mutateAsync({ userId: selectedUser.id, newPlan });
     }
   };
 

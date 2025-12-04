@@ -6,7 +6,8 @@ import Modal from "../../components/ui/modal/Modal";
 import { useModal } from "../../hooks/useModal";
 import useCustomToast from "../../hooks/useCustomToast";
 import { useAuth } from "../../context/AuthContext";
-import { PlanInfo } from "../../lib/api/models";
+import { apiClient } from "@/lib/api/client";
+import { PlanInfo } from "@/lib/api/models";
 import Button from "../../components/ui/button/Button";
 import { Loader2, Phone, CheckCircle, Shield } from 'lucide-react';
 import Alert from "../../components/ui/alert/Alert";
@@ -24,10 +25,10 @@ const PACKAGE_RANGES: PackageRange[] = [
 ];
 
 function Subscribptions() {
-  const { apiClient } = useAuth();
+  const { user } = useAuth();
   const { isOpen, openModal, closeModal } = useModal();
   const { showSuccessToast, showErrorToast } = useCustomToast();
-  
+
   const [plans, setPlans] = useState<{ [key: string]: PlanInfo }>({});
   const [currentPlan, setCurrentPlan] = useState<PlanInfo | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<PlanInfo | null>(null);
@@ -36,7 +37,7 @@ function Subscribptions() {
   const [isChangingPlan, setIsChangingPlan] = useState(false);
   const [isCustomRange, setIsCustomRange] = useState(false);
   const [customSmsCount, setCustomSmsCount] = useState<string>("");
-  
+
   // Payment states
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showOTPModal, setShowOTPModal] = useState(false);
@@ -93,17 +94,17 @@ function Subscribptions() {
   const calculateTotalCost = () => {
     if (!selectedPlan) return 0;
     const smsCost = parseFloat(selectedPlan.smsCost);
-    
+
     if (isCustomRange && customSmsCount) {
       const count = parseInt(customSmsCount);
       return isNaN(count) ? 0 : smsCost * count;
     }
-    
+
     if (selectedPackage) {
       const smsCount = selectedPackage.max || selectedPackage.min;
       return smsCost * smsCount;
     }
-    
+
     return 0;
   };
 
@@ -118,7 +119,7 @@ function Subscribptions() {
     setIsValidatingNumber(true);
     try {
       const formattedNumber = msisdn.startsWith('+') ? msisdn : `+${msisdn}`;
-      
+
       const response = await fetch('https://lucopay-backend.vercel.app/identity/msisdn', {
         method: 'POST',
         headers: {
@@ -129,28 +130,28 @@ function Subscribptions() {
       });
 
       const data = await response.json();
-      
+
       if (response.ok && data.success) {
         setIdentityName(data.identityname);
-        setAlert({ 
-          variant: 'success', 
-          title: 'Number Verified', 
-          message: `Account holder: ${data.identityname}` 
+        setAlert({
+          variant: 'success',
+          title: 'Number Verified',
+          message: `Account holder: ${data.identityname}`
         });
         return true;
       } else {
-        setAlert({ 
-          variant: 'error', 
-          title: 'Validation Failed', 
-          message: data.message || 'Could not validate phone number' 
+        setAlert({
+          variant: 'error',
+          title: 'Validation Failed',
+          message: data.message || 'Could not validate phone number'
         });
         return false;
       }
     } catch {
-      setAlert({ 
-        variant: 'error', 
-        title: 'Validation Error', 
-        message: 'Failed to validate phone number. Please try again.' 
+      setAlert({
+        variant: 'error',
+        title: 'Validation Error',
+        message: 'Failed to validate phone number. Please try again.'
       });
       return false;
     } finally {
@@ -162,7 +163,7 @@ function Subscribptions() {
   const handleInitiatePayment = async () => {
     const amount = calculateTotalCost();
     if (!amount || amount <= 0) return;
-    
+
     if (!phoneNumber) {
       setAlert({ variant: 'warning', title: 'Add Phone Number', message: 'Please add your phone number to receive the payment prompt.' });
       setShowNumberModal(true);
@@ -170,17 +171,17 @@ function Subscribptions() {
     }
 
     setIsProcessingPayment(true);
-    
+
     try {
       const reference = crypto.randomUUID();
-      
+
       let formattedPhone = phoneNumber.replace(/\D/g, '');
       if (formattedPhone.startsWith('256')) {
         formattedPhone = '0' + formattedPhone.substring(3);
       }
-      
+
       const amountInt = Math.round(amount);
-      
+
       const payload = {
         amount: amountInt,
         callback_url: 'https://mintospay.vercel.app/v1/pay/webhook/callback',
@@ -189,7 +190,7 @@ function Subscribptions() {
         phone_number: formattedPhone,
         reference: reference,
       };
-      
+
       const response = await fetch('https://mintospay.vercel.app/v1/pay/initialize', {
         method: 'POST',
         headers: {
@@ -200,27 +201,27 @@ function Subscribptions() {
       });
 
       const data = await response.json();
-      
+
       if (response.status === 201 && data.status === 'success') {
         const uuid = data.data.transaction.uuid;
         setTransactionUuid(uuid);
-        
+
         setShowPaymentModal(false);
         setShowOTPModal(true);
-        
-        setAlert({ 
-          variant: 'info', 
-          title: 'Payment Initiated', 
-          message: `Check your phone (${maskNumber(phoneNumber)}) to approve the payment.` 
+
+        setAlert({
+          variant: 'info',
+          title: 'Payment Initiated',
+          message: `Check your phone (${maskNumber(phoneNumber)}) to approve the payment.`
         });
-        
+
         pollPaymentStatus(uuid, amountInt);
       } else {
         let errorMessage = 'Could not initiate payment. Please try again.';
-        
+
         if (response.status === 422 && data.detail) {
           if (Array.isArray(data.detail)) {
-            errorMessage = data.detail.map((err: { loc?: string[]; msg: string }) => 
+            errorMessage = data.detail.map((err: { loc?: string[]; msg: string }) =>
               `${err.loc?.join('.') || 'field'}: ${err.msg}`
             ).join(', ');
           } else if (typeof data.detail === 'string') {
@@ -229,19 +230,19 @@ function Subscribptions() {
         } else if (data.message) {
           errorMessage = data.message;
         }
-        
-        setAlert({ 
-          variant: 'error', 
-          title: 'Payment Failed', 
+
+        setAlert({
+          variant: 'error',
+          title: 'Payment Failed',
           message: errorMessage
         });
         setIsProcessingPayment(false);
       }
     } catch {
-      setAlert({ 
-        variant: 'error', 
-        title: 'Payment Error', 
-        message: 'Failed to initiate payment. Please check your connection and try again.' 
+      setAlert({
+        variant: 'error',
+        title: 'Payment Error',
+        message: 'Failed to initiate payment. Please check your connection and try again.'
       });
       setIsProcessingPayment(false);
     }
@@ -251,7 +252,7 @@ function Subscribptions() {
   const pollPaymentStatus = async (uuid: string, amount: number) => {
     const maxAttempts = 30;
     let attempts = 0;
-    
+
     const checkStatus = async () => {
       try {
         const response = await fetch(`https://mintospay.vercel.app/v1/pay/verify/${uuid}`, {
@@ -262,31 +263,31 @@ function Subscribptions() {
         });
 
         const data = await response.json();
-        
+
         if (response.ok && data.status === 'success') {
           const txStatus = data.data.transaction.status;
-          
+
           if (txStatus === 'completed' || txStatus === 'success') {
             // Payment successful - now change the plan
             await handleConfirmPurchase();
-            
-            setAlert({ 
-              variant: 'success', 
-              title: 'Payment Successful!', 
-              message: `UGx ${amount.toFixed(2)} paid. Activating your ${selectedPlan?.planName} plan...` 
+
+            setAlert({
+              variant: 'success',
+              title: 'Payment Successful!',
+              message: `UGx ${amount.toFixed(2)} paid. Activating your ${selectedPlan?.planName} plan...`
             });
-            
+
             setIsProcessingPayment(false);
             setShowOTPModal(false);
             setTransactionUuid('');
             return;
           } else if (txStatus === 'failed' || txStatus === 'cancelled') {
-            setAlert({ 
-              variant: 'error', 
-              title: 'Payment Failed', 
-              message: 'Payment was declined or cancelled. Please try again.' 
+            setAlert({
+              variant: 'error',
+              title: 'Payment Failed',
+              message: 'Payment was declined or cancelled. Please try again.'
             });
-            
+
             setIsProcessingPayment(false);
             setShowOTPModal(false);
             setTransactionUuid('');
@@ -296,10 +297,10 @@ function Subscribptions() {
             if (attempts < maxAttempts) {
               setTimeout(checkStatus, 10000);
             } else {
-              setAlert({ 
-                variant: 'warning', 
-                title: 'Payment Pending', 
-                message: 'Payment is taking longer than expected. Please check back later.' 
+              setAlert({
+                variant: 'warning',
+                title: 'Payment Pending',
+                message: 'Payment is taking longer than expected. Please check back later.'
               });
               setIsProcessingPayment(false);
               setShowOTPModal(false);
@@ -310,10 +311,10 @@ function Subscribptions() {
           if (attempts < maxAttempts) {
             setTimeout(checkStatus, 10000);
           } else {
-            setAlert({ 
-              variant: 'error', 
-              title: 'Verification Error', 
-              message: 'Could not verify payment status. Please contact support.' 
+            setAlert({
+              variant: 'error',
+              title: 'Verification Error',
+              message: 'Could not verify payment status. Please contact support.'
             });
             setIsProcessingPayment(false);
             setShowOTPModal(false);
@@ -324,17 +325,17 @@ function Subscribptions() {
         if (attempts < maxAttempts) {
           setTimeout(checkStatus, 10000);
         } else {
-          setAlert({ 
-            variant: 'error', 
-            title: 'Verification Error', 
-            message: 'Could not verify payment status. Please contact support.' 
+          setAlert({
+            variant: 'error',
+            title: 'Verification Error',
+            message: 'Could not verify payment status. Please contact support.'
           });
           setIsProcessingPayment(false);
           setShowOTPModal(false);
         }
       }
     };
-    
+
     setTimeout(checkStatus, 5000);
   };
 
@@ -376,7 +377,7 @@ function Subscribptions() {
           newPlan: selectedPlan.planName,
         },
       });
-      
+
       showSuccessToast(`Successfully upgraded to ${selectedPlan.planName} plan!`);
       closeModal();
       setSelectedPlan(null);
@@ -542,11 +543,10 @@ function Subscribptions() {
                         <button
                           onClick={() => handleSelectPlan(plan)}
                           disabled={currentPlan?.planName === plan.planName}
-                          className={`px-4 py-2 rounded-lg text-white font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-                            currentPlan?.planName === plan.planName
+                          className={`px-4 py-2 rounded-lg text-white font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${currentPlan?.planName === plan.planName
                               ? "bg-gray-400 dark:bg-gray-600"
                               : getPlanButtonColor(plan.planName)
-                          }`}
+                            }`}
                         >
                           {currentPlan?.planName === plan.planName ? "Current" : "Select Plan"}
                         </button>
@@ -590,11 +590,10 @@ function Subscribptions() {
                   <button
                     key={idx}
                     onClick={() => handlePackageSelect(packageRange)}
-                    className={`p-4 rounded-lg border-2 text-left transition-all ${
-                      selectedPackage?.label === packageRange.label
+                    className={`p-4 rounded-lg border-2 text-left transition-all ${selectedPackage?.label === packageRange.label
                         ? "border-primary bg-primary/10 dark:bg-primary/20"
                         : "border-gray-200 dark:border-gray-600 hover:border-primary/50"
-                    }`}
+                      }`}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
@@ -617,11 +616,10 @@ function Subscribptions() {
                 {/* Custom Range Button */}
                 <button
                   onClick={handleCustomRangeSelect}
-                  className={`p-4 rounded-lg border-2 text-left transition-all ${
-                    isCustomRange
+                  className={`p-4 rounded-lg border-2 text-left transition-all ${isCustomRange
                       ? "border-primary bg-primary/10 dark:bg-primary/20"
                       : "border-gray-200 dark:border-gray-600 hover:border-primary/50"
-                  }`}
+                    }`}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex-1">

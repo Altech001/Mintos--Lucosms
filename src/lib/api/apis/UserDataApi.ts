@@ -13,34 +13,62 @@
  */
 
 
+import * as runtime from '../runtime';
 import type {
-    AddFundsRequest,
-    AllPlansResponse,
-    ChangePlanRequest,
-    CheckBalanceRequest,
-    DeductFundsRequest,
-    PlanInfo,
-    UpgradeRecommendationRequest,
-    UserProfileResponse,
-    UserStatsResponse,
-    WalletResponse
+  AddFundsRequest,
+  AllPlansResponse,
+  ChangePlanRequest,
+  CheckBalanceRequest,
+  DeductFundsRequest,
+  HTTPValidationError,
+  PlanInfo,
+  UpgradeRecommendationRequest,
+  UserProfileResponse,
+  UserStatsResponse,
+  WalletResponse,
 } from '../models/index';
 import {
+    AddFundsRequestFromJSON,
     AddFundsRequestToJSON,
     AllPlansResponseFromJSON,
+    AllPlansResponseToJSON,
+    ChangePlanRequestFromJSON,
     ChangePlanRequestToJSON,
+    CheckBalanceRequestFromJSON,
     CheckBalanceRequestToJSON,
+    DeductFundsRequestFromJSON,
     DeductFundsRequestToJSON,
+    HTTPValidationErrorFromJSON,
+    HTTPValidationErrorToJSON,
     PlanInfoFromJSON,
+    PlanInfoToJSON,
+    UpgradeRecommendationRequestFromJSON,
     UpgradeRecommendationRequestToJSON,
     UserProfileResponseFromJSON,
+    UserProfileResponseToJSON,
     UserStatsResponseFromJSON,
-    WalletResponseFromJSON
+    UserStatsResponseToJSON,
+    WalletResponseFromJSON,
+    WalletResponseToJSON,
 } from '../models/index';
-import * as runtime from '../runtime';
 
 export interface UserDataAddFundsToWalletRequest {
     addFundsRequest: AddFundsRequest;
+}
+
+export interface UserDataAdminAddFundsToWalletRequest {
+    userId: string;
+    addFundsRequest: AddFundsRequest;
+}
+
+export interface UserDataAdminChangePlanRequest {
+    userId: string;
+    changePlanRequest: ChangePlanRequest;
+}
+
+export interface UserDataAdminDeductFundsFromWalletRequest {
+    userId: string;
+    deductFundsRequest: DeductFundsRequest;
 }
 
 export interface UserDataChangePlanRequest {
@@ -81,6 +109,57 @@ export interface UserDataApiInterface {
      * Add Funds To Wallet
      */
     userDataAddFundsToWallet(requestParameters: UserDataAddFundsToWalletRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<WalletResponse>;
+
+    /**
+     * Add funds to a specific user\'s wallet. (Admin only)
+     * @summary Admin Add Funds To Wallet
+     * @param {string} userId 
+     * @param {AddFundsRequest} addFundsRequest 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof UserDataApiInterface
+     */
+    userDataAdminAddFundsToWalletRaw(requestParameters: UserDataAdminAddFundsToWalletRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<WalletResponse>>;
+
+    /**
+     * Add funds to a specific user\'s wallet. (Admin only)
+     * Admin Add Funds To Wallet
+     */
+    userDataAdminAddFundsToWallet(requestParameters: UserDataAdminAddFundsToWalletRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<WalletResponse>;
+
+    /**
+     * Change a specific user\'s subscription plan. (Admin only)
+     * @summary Admin Change Plan
+     * @param {string} userId 
+     * @param {ChangePlanRequest} changePlanRequest 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof UserDataApiInterface
+     */
+    userDataAdminChangePlanRaw(requestParameters: UserDataAdminChangePlanRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<UserProfileResponse>>;
+
+    /**
+     * Change a specific user\'s subscription plan. (Admin only)
+     * Admin Change Plan
+     */
+    userDataAdminChangePlan(requestParameters: UserDataAdminChangePlanRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<UserProfileResponse>;
+
+    /**
+     * Deduct funds from a specific user\'s wallet. (Admin only)
+     * @summary Admin Deduct Funds From Wallet
+     * @param {string} userId 
+     * @param {DeductFundsRequest} deductFundsRequest 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof UserDataApiInterface
+     */
+    userDataAdminDeductFundsFromWalletRaw(requestParameters: UserDataAdminDeductFundsFromWalletRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<WalletResponse>>;
+
+    /**
+     * Deduct funds from a specific user\'s wallet. (Admin only)
+     * Admin Deduct Funds From Wallet
+     */
+    userDataAdminDeductFundsFromWallet(requestParameters: UserDataAdminDeductFundsFromWalletRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<WalletResponse>;
 
     /**
      * Change user\'s subscription plan.  Changing to a better plan will automatically update the SMS cost to a better rate.
@@ -286,6 +365,168 @@ export class UserDataApi extends runtime.BaseAPI implements UserDataApiInterface
      */
     async userDataAddFundsToWallet(requestParameters: UserDataAddFundsToWalletRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<WalletResponse> {
         const response = await this.userDataAddFundsToWalletRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Add funds to a specific user\'s wallet. (Admin only)
+     * Admin Add Funds To Wallet
+     */
+    async userDataAdminAddFundsToWalletRaw(requestParameters: UserDataAdminAddFundsToWalletRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<WalletResponse>> {
+        if (requestParameters['userId'] == null) {
+            throw new runtime.RequiredError(
+                'userId',
+                'Required parameter "userId" was null or undefined when calling userDataAdminAddFundsToWallet().'
+            );
+        }
+
+        if (requestParameters['addFundsRequest'] == null) {
+            throw new runtime.RequiredError(
+                'addFundsRequest',
+                'Required parameter "addFundsRequest" was null or undefined when calling userDataAdminAddFundsToWallet().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+        if (this.configuration && this.configuration.accessToken) {
+            // oauth required
+            headerParameters["Authorization"] = await this.configuration.accessToken("OAuth2PasswordBearer", []);
+        }
+
+
+        let urlPath = `/api/v1/user-data/admin/{user_id}/add-funds`;
+        urlPath = urlPath.replace(`{${"user_id"}}`, encodeURIComponent(String(requestParameters['userId'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: AddFundsRequestToJSON(requestParameters['addFundsRequest']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => WalletResponseFromJSON(jsonValue));
+    }
+
+    /**
+     * Add funds to a specific user\'s wallet. (Admin only)
+     * Admin Add Funds To Wallet
+     */
+    async userDataAdminAddFundsToWallet(requestParameters: UserDataAdminAddFundsToWalletRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<WalletResponse> {
+        const response = await this.userDataAdminAddFundsToWalletRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Change a specific user\'s subscription plan. (Admin only)
+     * Admin Change Plan
+     */
+    async userDataAdminChangePlanRaw(requestParameters: UserDataAdminChangePlanRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<UserProfileResponse>> {
+        if (requestParameters['userId'] == null) {
+            throw new runtime.RequiredError(
+                'userId',
+                'Required parameter "userId" was null or undefined when calling userDataAdminChangePlan().'
+            );
+        }
+
+        if (requestParameters['changePlanRequest'] == null) {
+            throw new runtime.RequiredError(
+                'changePlanRequest',
+                'Required parameter "changePlanRequest" was null or undefined when calling userDataAdminChangePlan().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+        if (this.configuration && this.configuration.accessToken) {
+            // oauth required
+            headerParameters["Authorization"] = await this.configuration.accessToken("OAuth2PasswordBearer", []);
+        }
+
+
+        let urlPath = `/api/v1/user-data/admin/{user_id}/change-plan`;
+        urlPath = urlPath.replace(`{${"user_id"}}`, encodeURIComponent(String(requestParameters['userId'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: ChangePlanRequestToJSON(requestParameters['changePlanRequest']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => UserProfileResponseFromJSON(jsonValue));
+    }
+
+    /**
+     * Change a specific user\'s subscription plan. (Admin only)
+     * Admin Change Plan
+     */
+    async userDataAdminChangePlan(requestParameters: UserDataAdminChangePlanRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<UserProfileResponse> {
+        const response = await this.userDataAdminChangePlanRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Deduct funds from a specific user\'s wallet. (Admin only)
+     * Admin Deduct Funds From Wallet
+     */
+    async userDataAdminDeductFundsFromWalletRaw(requestParameters: UserDataAdminDeductFundsFromWalletRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<WalletResponse>> {
+        if (requestParameters['userId'] == null) {
+            throw new runtime.RequiredError(
+                'userId',
+                'Required parameter "userId" was null or undefined when calling userDataAdminDeductFundsFromWallet().'
+            );
+        }
+
+        if (requestParameters['deductFundsRequest'] == null) {
+            throw new runtime.RequiredError(
+                'deductFundsRequest',
+                'Required parameter "deductFundsRequest" was null or undefined when calling userDataAdminDeductFundsFromWallet().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+        if (this.configuration && this.configuration.accessToken) {
+            // oauth required
+            headerParameters["Authorization"] = await this.configuration.accessToken("OAuth2PasswordBearer", []);
+        }
+
+
+        let urlPath = `/api/v1/user-data/admin/{user_id}/deduct-funds`;
+        urlPath = urlPath.replace(`{${"user_id"}}`, encodeURIComponent(String(requestParameters['userId'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: DeductFundsRequestToJSON(requestParameters['deductFundsRequest']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => WalletResponseFromJSON(jsonValue));
+    }
+
+    /**
+     * Deduct funds from a specific user\'s wallet. (Admin only)
+     * Admin Deduct Funds From Wallet
+     */
+    async userDataAdminDeductFundsFromWallet(requestParameters: UserDataAdminDeductFundsFromWalletRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<WalletResponse> {
+        const response = await this.userDataAdminDeductFundsFromWalletRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

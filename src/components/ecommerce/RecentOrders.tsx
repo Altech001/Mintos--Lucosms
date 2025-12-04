@@ -10,56 +10,20 @@ import Checkbox from "../form/input/Checkbox";
 import { useState } from "react";
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../context/AuthContext';
+import { apiClient } from "@/lib/api/client";
+import { SmsHistoryPublic } from "@/lib/api/models";
 
-interface SmsHistory {
-  id: string;
-  recipient: string;
-  message: string;
-  status: string;
-  sms_count: number;
-  cost: number;
-  template_id: string | null;
-  error_message: string | null;
-  delivery_status: string;
-  external_id: string | null;
-  created_at: string;
-  updated_at: string;
-  sent_at: string | null;
-  delivered_at: string | null;
-  user_id: string;
-}
 
-interface SmsHistoryResponse {
-  data: SmsHistory[];
-  count: number;
-}
 
 export default function RecentOrders() {
-  const { user, apiClient } = useAuth();
+  const { user } = useAuth();
   const [selectAll, setSelectAll] = useState(false);
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
 
   // Fetch recent SMS history (last 2)
-  const fetchRecentSms = async (): Promise<SmsHistory[]> => {
-    const token = apiClient.getToken();
-    if (!token) return [];
-
-    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-    const endpoint = `${baseUrl}/api/v1/historysms/?skip=0&limit=5`;
-
-    const response = await fetch(endpoint, {
-      headers: {
-        'accept': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to fetch SMS history');
-    }
-
-    const result: SmsHistoryResponse = await response.json();
-    return result.data;
+  const fetchRecentSms = async (): Promise<SmsHistoryPublic[]> => {
+    const response = await apiClient.api.historySms.historysmsListMySmsHistory({ skip: 0, limit: 5 });
+    return response.data;
   };
 
   const { data: recentSms = [], isLoading } = useQuery({
@@ -99,7 +63,7 @@ export default function RecentOrders() {
         </div>
 
         <div className="flex items-center gap-3">
-          
+
           <button className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-theme-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 hover:text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] dark:hover:text-gray-200">
             Analyze Report
           </button>
@@ -113,8 +77,8 @@ export default function RecentOrders() {
                 isHeader
                 className="py-3 px-4 font-medium text-gray-700 dark:text-white text-start text-theme-xs whitespace-nowrap"
               >
-                <Checkbox 
-                  checked={selectAll} 
+                <Checkbox
+                  checked={selectAll}
                   onChange={handleSelectAll}
                 />
               </TableCell>
@@ -174,15 +138,15 @@ export default function RecentOrders() {
               recentSms.map((sms) => (
                 <TableRow key={sms.id}>
                   <TableCell className="py-3 px-4">
-                    <Checkbox 
-                      checked={selectedItems.includes(sms.id)} 
+                    <Checkbox
+                      checked={selectedItems.includes(sms.id)}
                       onChange={(checked) => handleSelectItem(sms.id, checked)}
                     />
                   </TableCell>
                   <TableCell className="py-3 px-4 text-gray-700 text-theme-sm dark:text-gray-300 whitespace-nowrap">
-                    {new Date(sms.created_at).toLocaleDateString('en-US', { 
-                      year: 'numeric', 
-                      month: 'short', 
+                    {new Date(sms.createdAt).toLocaleDateString('en-US', {
+                      year: 'numeric',
+                      month: 'short',
                       day: 'numeric',
                       hour: '2-digit',
                       minute: '2-digit'
@@ -200,8 +164,8 @@ export default function RecentOrders() {
                         sms.status === "delivered"
                           ? "success"
                           : sms.status === "pending"
-                          ? "warning"
-                          : "error"
+                            ? "warning"
+                            : "error"
                       }
                     >
                       {sms.status}

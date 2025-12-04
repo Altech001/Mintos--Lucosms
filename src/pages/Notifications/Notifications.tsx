@@ -6,40 +6,24 @@ import PageMeta from "../../components/common/PageMeta";
 import { Search, ChevronLeft, ChevronRight, Bell, BellOff, Check, CheckCheck, Trash2, Eye } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../context/AuthContext';
+import { apiClient } from '@/lib/api/client';
+import { SmsHistoryPublic } from '@/lib/api/models';
 import Badge from '../../components/ui/badge/Badge';
 import Button from '../../components/ui/button/Button';
 import useCustomToast from '../../hooks/useCustomToast';
 
-interface SmsHistory {
-  id: string;
-  recipient: string;
-  message: string;
-  status: string;
-  sms_count: number;
-  cost: number;
-  template_id: string | null;
-  error_message: string | null;
-  delivery_status: string;
-  external_id: string | null;
-  created_at: string;
-  updated_at: string;
-  sent_at: string | null;
-  delivered_at: string | null;
-  user_id: string;
-  is_read?: boolean; // Local state for read/unread
+interface SmsHistoryWithRead extends SmsHistoryPublic {
+  isRead?: boolean; // Local state for read/unread
 }
 
-interface SmsHistoryResponse {
-  data: SmsHistory[];
-  count: number;
-}
+
 
 export default function Notifications() {
-  const { user, apiClient } = useAuth();
+  const { user } = useAuth();
   const { showSuccessToast, showErrorToast } = useCustomToast();
   const queryClient = useQueryClient();
   const isAdmin = !!user?.isSuperuser;
-  
+
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [filterStatus, setFilterStatus] = useState<'all' | 'unread' | 'read'>('all');
@@ -47,31 +31,15 @@ export default function Notifications() {
   const [readStatus, setReadStatus] = useState<Record<string, boolean>>({});
 
   // Fetch SMS history
-  const fetchSmsHistory = async (): Promise<SmsHistory[]> => {
-    const token = apiClient.getToken();
-    if (!token) return [];
+  const fetchSmsHistory = async (): Promise<SmsHistoryWithRead[]> => {
+    const response = isAdmin
+      ? await apiClient.api.historySms.historysmsListAllSmsHistory({ skip: 0, limit: 100 })
+      : await apiClient.api.historySms.historysmsListMySmsHistory({ skip: 0, limit: 100 });
 
-    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-    const endpoint = isAdmin 
-      ? `${baseUrl}/api/v1/historysms/all?skip=0&limit=100`
-      : `${baseUrl}/api/v1/historysms/?skip=0&limit=100`;
-
-    const response = await fetch(endpoint, {
-      headers: {
-        'accept': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to fetch SMS history');
-    }
-
-    const result: SmsHistoryResponse = await response.json();
     // Add read status from local state
-    return result.data.map(sms => ({
+    return response.data.map(sms => ({
       ...sms,
-      is_read: readStatus[sms.id] ?? false
+      isRead: readStatus[sms.id] ?? false
     }));
   };
 
@@ -142,9 +110,9 @@ export default function Notifications() {
 
     // Filter by read status
     if (filterStatus === 'unread') {
-      filtered = filtered.filter(sms => !sms.is_read);
+      filtered = filtered.filter(sms => !sms.isRead);
     } else if (filterStatus === 'read') {
-      filtered = filtered.filter(sms => sms.is_read);
+      filtered = filtered.filter(sms => sms.isRead);
     }
 
     // Filter by search term
@@ -154,7 +122,7 @@ export default function Notifications() {
         (sms.recipient?.toLowerCase() || '').includes(searchLower) ||
         (sms.message?.toLowerCase() || '').includes(searchLower) ||
         (sms.status?.toLowerCase() || '').includes(searchLower) ||
-        (sms.delivery_status?.toLowerCase() || '').includes(searchLower)
+        (sms.deliveryStatus?.toLowerCase() || '').includes(searchLower)
       );
     }
 
@@ -168,7 +136,7 @@ export default function Notifications() {
     currentPage * itemsPerPage
   );
 
-  const unreadCount = smsHistory.filter(sms => !sms.is_read).length;
+  const unreadCount = smsHistory.filter(sms => !sms.isRead).length;
 
   // Handlers
   const handleMarkAsRead = useCallback((id: string) => {
@@ -207,7 +175,7 @@ export default function Notifications() {
   }, [selectedNotifications, markAsReadMutation]);
 
   const handleMarkAllAsRead = useCallback(() => {
-    const unreadIds = smsHistory.filter(sms => !sms.is_read).map(sms => sms.id);
+    const unreadIds = smsHistory.filter(sms => !sms.isRead).map(sms => sms.id);
     if (unreadIds.length > 0) {
       markAsReadMutation.mutate(unreadIds);
     }
@@ -243,7 +211,7 @@ export default function Notifications() {
     if (diffMins < 60) return `${diffMins} min${diffMins > 1 ? 's' : ''} ago`;
     if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
     if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
-    
+
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
@@ -256,7 +224,7 @@ export default function Notifications() {
       <PageBreadcrumb pageTitle="Notifications" />
 
       <div className="min-h-auto rounded-xl border border-gray-200 bg-white px-5 py-7 dark:border-gray-800 dark:bg-white/3 xl:px-10">
-        
+
         {/* Header with Stats */}
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-4">
@@ -289,31 +257,28 @@ export default function Notifications() {
         <div className="mb-6 flex items-center gap-2 border-b border-gray-200 dark:border-gray-800">
           <button
             onClick={() => setFilterStatus('all')}
-            className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
-              filterStatus === 'all'
-                ? 'border-brand-600 text-brand-600 dark:text-brand-400'
-                : 'border-transparent text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'
-            }`}
+            className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${filterStatus === 'all'
+              ? 'border-brand-600 text-brand-600 dark:text-brand-400'
+              : 'border-transparent text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'
+              }`}
           >
             All ({smsHistory.length})
           </button>
           <button
             onClick={() => setFilterStatus('unread')}
-            className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
-              filterStatus === 'unread'
-                ? 'border-brand-600 text-brand-600 dark:text-brand-400'
-                : 'border-transparent text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'
-            }`}
+            className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${filterStatus === 'unread'
+              ? 'border-brand-600 text-brand-600 dark:text-brand-400'
+              : 'border-transparent text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'
+              }`}
           >
             Unread ({unreadCount})
           </button>
           <button
             onClick={() => setFilterStatus('read')}
-            className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
-              filterStatus === 'read'
-                ? 'border-brand-600 text-brand-600 dark:text-brand-400'
-                : 'border-transparent text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'
-            }`}
+            className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${filterStatus === 'read'
+              ? 'border-brand-600 text-brand-600 dark:text-brand-400'
+              : 'border-transparent text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'
+              }`}
           >
             Read ({smsHistory.length - unreadCount})
           </button>
@@ -363,11 +328,10 @@ export default function Notifications() {
             <button
               onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
               disabled={currentPage === 1}
-              className={`p-2 rounded-lg border transition-all duration-200 ${
-                currentPage === 1
-                  ? 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed dark:border-gray-700 dark:bg-white/5'
-                  : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-300 dark:border-gray-700 dark:bg-white/5 dark:text-gray-300 dark:hover:bg-white/10'
-              }`}
+              className={`p-2 rounded-lg border transition-all duration-200 ${currentPage === 1
+                ? 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed dark:border-gray-700 dark:bg-white/5'
+                : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-300 dark:border-gray-700 dark:bg-white/5 dark:text-gray-300 dark:hover:bg-white/10'
+                }`}
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
@@ -379,11 +343,10 @@ export default function Notifications() {
             <button
               onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
               disabled={currentPage === totalPages || totalPages === 0}
-              className={`p-2 rounded-lg border transition-all duration-200 ${
-                currentPage === totalPages || totalPages === 0
-                  ? 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed dark:border-gray-700 dark:bg-white/5'
-                  : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-300 dark:border-gray-700 dark:bg-white/5 dark:text-gray-300 dark:hover:bg-white/10'
-              }`}
+              className={`p-2 rounded-lg border transition-all duration-200 ${currentPage === totalPages || totalPages === 0
+                ? 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed dark:border-gray-700 dark:bg-white/5'
+                : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-300 dark:border-gray-700 dark:bg-white/5 dark:text-gray-300 dark:hover:bg-white/10'
+                }`}
             >
               <ChevronRight className="w-4 h-4" />
             </button>
@@ -430,11 +393,10 @@ export default function Notifications() {
               {paginatedHistory.map((notification) => (
                 <div
                   key={notification.id}
-                  className={`flex items-start gap-4 p-4 rounded-lg border transition-all duration-200 ${
-                    notification.is_read
-                      ? 'border-gray-200 bg-white dark:border-gray-800 dark:bg-white/3'
-                      : 'border-brand-200 bg-brand-50/30 dark:border-brand-900/30 dark:bg-brand-900/10'
-                  } hover:shadow-sm`}
+                  className={`flex items-start gap-4 p-4 rounded-lg border transition-all duration-200 ${notification.isRead
+                    ? 'border-gray-200 bg-white dark:border-gray-800 dark:bg-white/3'
+                    : 'border-brand-200 bg-brand-50/30 dark:border-brand-900/30 dark:bg-brand-900/10'
+                    } hover:shadow-sm`}
                 >
                   {/* Checkbox */}
                   <input
@@ -445,38 +407,35 @@ export default function Notifications() {
                   />
 
                   {/* Icon */}
-                  <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${
-                    notification.delivery_status === 'delivered'
-                      ? 'bg-green-100 dark:bg-green-900/30'
-                      : notification.delivery_status === 'failed'
+                  <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${notification.deliveryStatus === 'delivered'
+                    ? 'bg-green-100 dark:bg-green-900/30'
+                    : notification.deliveryStatus === 'failed'
                       ? 'bg-red-100 dark:bg-red-900/30'
                       : 'bg-blue-100 dark:bg-blue-900/30'
-                  }`}>
-                    <Bell className={`w-5 h-5 ${
-                      notification.delivery_status === 'delivered'
-                        ? 'text-green-600 dark:text-green-400'
-                        : notification.delivery_status === 'failed'
+                    }`}>
+                    <Bell className={`w-5 h-5 ${notification.deliveryStatus === 'delivered'
+                      ? 'text-green-600 dark:text-green-400'
+                      : notification.deliveryStatus === 'failed'
                         ? 'text-red-600 dark:text-red-400'
                         : 'text-blue-600 dark:text-blue-400'
-                    }`} />
+                      }`} />
                   </div>
 
                   {/* Content */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2 mb-1">
                       <div className="flex items-center gap-2">
-                        <p className={`text-sm font-medium ${
-                          notification.is_read
-                            ? 'text-gray-700 dark:text-gray-300'
-                            : 'text-gray-900 dark:text-white'
-                        }`}>
+                        <p className={`text-sm font-medium ${notification.isRead
+                          ? 'text-gray-700 dark:text-gray-300'
+                          : 'text-gray-900 dark:text-white'
+                          }`}>
                           SMS to {notification.recipient}
                         </p>
-                        {!notification.is_read && (
+                        {!notification.isRead && (
                           <span className="w-2 h-2 bg-brand-600 rounded-full"></span>
                         )}
                       </div>
-                      {getStatusBadge(notification.status, notification.delivery_status)}
+                      {getStatusBadge(notification.status, notification.deliveryStatus)}
                     </div>
 
                     <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2 mb-2">
@@ -484,9 +443,9 @@ export default function Notifications() {
                     </p>
 
                     <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-500">
-                      <span>{formatDate(notification.created_at)}</span>
+                      <span>{formatDate(notification.createdAt.toString())}</span>
                       <span>•</span>
-                      <span>{notification.sms_count} segment{notification.sms_count > 1 ? 's' : ''}</span>
+                      <span>{notification.smsCount} segment{notification.smsCount > 1 ? 's' : ''}</span>
                       <span>•</span>
                       <span>UGX {notification.cost}</span>
                     </div>
@@ -494,7 +453,7 @@ export default function Notifications() {
 
                   {/* Actions */}
                   <div className="flex items-center gap-1">
-                    {notification.is_read ? (
+                    {notification.isRead ? (
                       <button
                         onClick={() => handleMarkAsUnread(notification.id)}
                         className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"

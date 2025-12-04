@@ -1,82 +1,89 @@
+import { Configuration } from './runtime'
 import {
-  Configuration,
   ApiKeysApi,
   ContactsApi,
+  HistorysmsApi,
   ItemsApi,
   LoginApi,
+  MoreAdminPrivilegesApi,
   PrivateApi,
   PromoCodesApi,
   SmsApi,
+  SystemApi,
   TemplatesApi,
   TicketsApi,
+  TransactionsApi,
   UserDataApi,
   UsersApi,
-  UtilsApi,
-} from './index';
+  UtilsApi
+} from './apis'
 
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+// Get base URL from environment or use default
+const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
-export class ApiClient {
-  private config: Configuration;
-  public api: {
-    apiKeys: ApiKeysApi;
-    contacts: ContactsApi;
-    items: ItemsApi;
-    login: LoginApi;
-    private: PrivateApi;
-    promoCodes: PromoCodesApi;
-    sms: SmsApi;
-    templates: TemplatesApi;
-    tickets: TicketsApi;
-    userData: UserDataApi;
-    users: UsersApi;
-    utils: UtilsApi;
-  };
-
-  constructor() {
-    this.config = new Configuration({
-      basePath: BASE_URL,
-      accessToken: () => {
-        const token = this.getToken();
-        return token ? `Bearer ${token}` : '';
-      },
-    });
-    this.api = this.createApiInstances();
+// Create configuration
+const config = new Configuration({
+  basePath: BASE_URL,
+  accessToken: async () => {
+    const token = localStorage.getItem('token');
+    return token ? `Bearer ${token}` : '';
   }
+})
 
-  private createApiInstances() {
-    return {
-      apiKeys: new ApiKeysApi(this.config),
-      contacts: new ContactsApi(this.config),
-      items: new ItemsApi(this.config),
-      login: new LoginApi(this.config),
-      private: new PrivateApi(this.config),
-      promoCodes: new PromoCodesApi(this.config),
-      sms: new SmsApi(this.config),
-      templates: new TemplatesApi(this.config),
-      tickets: new TicketsApi(this.config),
-      userData: new UserDataApi(this.config),
-      users: new UsersApi(this.config),
-      utils: new UtilsApi(this.config),
-    };
-  }
+class ApiClient {
+  public apiKeys: ApiKeysApi;
+  public contacts: ContactsApi;
+  public historySms: HistorysmsApi;
+  public items: ItemsApi;
+  public login: LoginApi;
+  public admin: MoreAdminPrivilegesApi;
+  public private: PrivateApi;
+  public promoCodes: PromoCodesApi;
+  public sms: SmsApi;
+  public system: SystemApi;
+  public templates: TemplatesApi;
+  public tickets: TicketsApi;
+  public transactions: TransactionsApi;
+  public userData: UserDataApi;
+  public users: UsersApi;
+  public utils: UtilsApi;
 
-  setToken(token: string) {
-    localStorage.setItem('access_token', token);
-    // The accessToken function in the config will now pick up the new token
-    // We need to recreate the instances for them to get the new config context if the implementation requires it.
-    this.api = this.createApiInstances();
-  }
-
-  clearToken() {
-    localStorage.removeItem('access_token');
-    // The accessToken function in the config will now return null
-    this.api = this.createApiInstances();
-  }
-
-  getToken(): string | null {
-    return localStorage.getItem('access_token');
+  constructor(config: Configuration) {
+    this.apiKeys = new ApiKeysApi(config);
+    this.contacts = new ContactsApi(config);
+    this.historySms = new HistorysmsApi(config);
+    this.items = new ItemsApi(config);
+    this.login = new LoginApi(config);
+    this.admin = new MoreAdminPrivilegesApi(config);
+    this.private = new PrivateApi(config);
+    this.promoCodes = new PromoCodesApi(config);
+    this.sms = new SmsApi(config);
+    this.system = new SystemApi(config);
+    this.templates = new TemplatesApi(config);
+    this.tickets = new TicketsApi(config);
+    this.transactions = new TransactionsApi(config);
+    this.userData = new UserDataApi(config);
+    this.users = new UsersApi(config);
+    this.utils = new UtilsApi(config);
   }
 }
 
-export const apiClient = new ApiClient();
+const api = new ApiClient(config);
+
+// Create and export API client instance
+export const apiClient = {
+  api
+}
+
+// Helper to set auth token
+export function setAuthToken(token: string) {
+  localStorage.setItem('token', token);
+}
+
+// Helper to clear auth token
+export function clearAuthToken() {
+  localStorage.removeItem('token');
+}
+
+// Export configuration for custom instances
+export { Configuration }

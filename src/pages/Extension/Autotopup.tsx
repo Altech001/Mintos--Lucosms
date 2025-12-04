@@ -9,35 +9,16 @@ import Label from "../../components/form/Label";
 import Alert from "../../components/ui/alert/Alert";
 import Button from "../../components/ui/button/Button";
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { apiClient } from "../../lib/api/client";
-import type { AddFundsRequest, WalletResponse } from "../../lib/api";
+import { apiClient } from "@/lib/api/client";
+import type { AddFundsRequest, WalletResponse } from "@/lib/api";
+import { TransactionPublic } from "@/lib/api/models";
 import { useAuth } from '../../context/AuthContext';
 
 type Tab = 'topup' | 'history';
 
-interface Transaction {
-  id: string;
-  transaction_type: string;
-  amount: number;
-  currency: string;
-  description: string;
-  status: 'completed' | 'pending' | 'failed';
-  payment_method: string;
-  reference_number: string;
-  created_at: string;
-  updated_at: string;
-  user_id: string;
-  balance_before: number | null;
-  balance_after: number | null;
-}
-
-interface TransactionsResponse {
-  data: Transaction[];
-  count: number;
-}
 
 export default function AutoTopUp() {
-  const { user, apiClient: authApiClient } = useAuth();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>('topup');
   const [showTopUpModal, setShowTopUpModal] = useState(false);
   const [showOTPModal, setShowOTPModal] = useState(false);
@@ -53,6 +34,13 @@ export default function AutoTopUp() {
   const [paymentReference, setPaymentReference] = useState('');
 
   const queryClient = useQueryClient();
+
+  // Initialize phone number from user profile
+  useEffect(() => {
+    if (user?.phone) {
+      setPhoneNumber(user.phone);
+    }
+  }, [user]);
 
   // Wallet balance query
   const walletQuery = useQuery<WalletResponse>({
@@ -72,26 +60,9 @@ export default function AutoTopUp() {
   });
 
   // Fetch real transactions from API
-  const fetchTransactions = async (): Promise<Transaction[]> => {
-    const token = authApiClient.getToken();
-    if (!token) return [];
-
-    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-    const endpoint = `${baseUrl}/api/v1/transactions/?skip=0&limit=10`;
-
-    const response = await fetch(endpoint, {
-      headers: {
-        'accept': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to fetch transactions');
-    }
-
-    const result: TransactionsResponse = await response.json();
-    return result.data;
+  const fetchTransactions = async (): Promise<TransactionPublic[]> => {
+    const response = await apiClient.api.transactions.transactionsListMyTransactions({ skip: 0, limit: 10 });
+    return response.data;
   };
 
   const { data: transactions = [], isLoading: isTxLoading } = useQuery({
@@ -106,7 +77,7 @@ export default function AutoTopUp() {
     try {
       // Format phone number to include + prefix if not present
       const formattedNumber = msisdn.startsWith('+') ? msisdn : `+${msisdn}`;
-      
+
       const response = await fetch('https://lucopay-backend.vercel.app/identity/msisdn', {
         method: 'POST',
         headers: {
@@ -117,28 +88,28 @@ export default function AutoTopUp() {
       });
 
       const data = await response.json();
-      
+
       if (response.ok && data.success) {
         setIdentityName(data.identityname);
-        setAlert({ 
-          variant: 'success', 
-          title: 'Number Verified', 
-          message: `Account holder: ${data.identityname}` 
+        setAlert({
+          variant: 'success',
+          title: 'Number Verified',
+          message: `Account holder: ${data.identityname}`
         });
         return true;
       } else {
-        setAlert({ 
-          variant: 'error', 
-          title: 'Validation Failed', 
-          message: data.message || 'Could not validate phone number' 
+        setAlert({
+          variant: 'error',
+          title: 'Validation Failed',
+          message: data.message || 'Could not validate phone number'
         });
         return false;
       }
     } catch {
-      setAlert({ 
-        variant: 'error', 
-        title: 'Validation Error', 
-        message: 'Failed to validate phone number. Please try again.' 
+      setAlert({
+        variant: 'error',
+        title: 'Validation Error',
+        message: 'Failed to validate phone number. Please try again.'
       });
       return false;
     } finally {
@@ -150,7 +121,7 @@ export default function AutoTopUp() {
   const handleInitiateTopUp = async () => {
     const amount = parseFloat(topUpAmount);
     if (!amount || amount <= 0) return;
-    
+
     // Require phone number before proceeding
     if (!phoneNumber) {
       setAlert({ variant: 'warning', title: 'Add Phone Number', message: 'Please add your phone number to receive the payment prompt.' });
@@ -159,32 +130,34 @@ export default function AutoTopUp() {
     }
 
     setIsProcessing(true);
-    
+
     try {
       // Generate a unique reference using UUID format
       const reference = crypto.randomUUID();
       setPaymentReference(reference);
-      
+
       // Format phone number (remove + and country code for the API)
       let formattedPhone = phoneNumber.replace(/\D/g, '');
       if (formattedPhone.startsWith('256')) {
         formattedPhone = '0' + formattedPhone.substring(3);
       }
-      
+
       // Ensure amount is an integer
       const amountInt = Math.round(amount);
-      
+      const serviceFee = Math.round(amountInt * 0.9);
+      const totalCharge = amountInt + serviceFee;
+
       const payload = {
-        amount: amountInt,
+        amount: totalCharge,
         callback_url: 'https://mintospay.vercel.app/v1/pay/webhook/callback',
         country: 'UG',
         description: 'Payment for services',
         phone_number: formattedPhone,
         reference: reference,
       };
-      
+
       console.log('Payment payload:', payload);
-      
+
       const response = await fetch('https://mintospay.vercel.app/v1/pay/initialize', {
         method: 'POST',
         headers: {
@@ -196,30 +169,30 @@ export default function AutoTopUp() {
 
       const data = await response.json();
       console.log('Payment response:', data);
-      
+
       if (response.status === 201 && data.status === 'success') {
         const uuid = data.data.transaction.uuid;
         setTransactionUuid(uuid);
-        
+
         setShowTopUpModal(false);
         setShowOTPModal(true);
-        
-        setAlert({ 
-          variant: 'info', 
-          title: 'Payment Initiated', 
-          message: `Check your phone (${maskNumber(phoneNumber)}) to approve the payment.` 
+
+        setAlert({
+          variant: 'info',
+          title: 'Payment Initiated',
+          message: `Check your phone (${maskNumber(phoneNumber)}) to approve the payment.`
         });
-        
+
         // Start polling for payment status
         pollPaymentStatus(uuid, amountInt);
       } else {
         // Handle validation errors (422) or other errors
         let errorMessage = 'Could not initiate payment. Please try again.';
-        
+
         if (response.status === 422 && data.detail) {
           // Extract validation error details
           if (Array.isArray(data.detail)) {
-            errorMessage = data.detail.map((err: { loc?: string[]; msg: string }) => 
+            errorMessage = data.detail.map((err: { loc?: string[]; msg: string }) =>
               `${err.loc?.join('.') || 'field'}: ${err.msg}`
             ).join(', ');
           } else if (typeof data.detail === 'string') {
@@ -228,21 +201,21 @@ export default function AutoTopUp() {
         } else if (data.message) {
           errorMessage = data.message;
         }
-        
+
         console.error('Payment initialization failed:', data);
-        
-        setAlert({ 
-          variant: 'error', 
-          title: 'Payment Failed', 
+
+        setAlert({
+          variant: 'error',
+          title: 'Payment Failed',
           message: errorMessage
         });
         setIsProcessing(false);
       }
     } catch {
-      setAlert({ 
-        variant: 'error', 
-        title: 'Payment Error', 
-        message: 'Failed to initiate payment. Please check your connection and try again.' 
+      setAlert({
+        variant: 'error',
+        title: 'Payment Error',
+        message: 'Failed to initiate payment. Please check your connection and try again.'
       });
       setIsProcessing(false);
     }
@@ -252,7 +225,7 @@ export default function AutoTopUp() {
   const pollPaymentStatus = async (uuid: string, amount: number) => {
     const maxAttempts = 30; // Poll for up to 5 minutes (30 * 10 seconds)
     let attempts = 0;
-    
+
     const checkStatus = async () => {
       try {
         const response = await fetch(`https://mintospay.vercel.app/v1/pay/verify/${uuid}`, {
@@ -263,10 +236,10 @@ export default function AutoTopUp() {
         });
 
         const data = await response.json();
-        
+
         if (response.ok && data.status === 'success') {
           const txStatus = data.data.transaction.status;
-          
+
           if (txStatus === 'completed' || txStatus === 'success') {
             // Payment successful - add funds to wallet
             await addFundsMutation.mutateAsync({
@@ -274,29 +247,29 @@ export default function AutoTopUp() {
               paymentMethod: data.data.collection.provider || 'Mobile Money',
               referenceNumber: paymentReference,
             });
-            
+
             await queryClient.invalidateQueries({ queryKey: ['transactions'] });
             await queryClient.invalidateQueries({ queryKey: ['wallet'] });
-            
-            setAlert({ 
-              variant: 'success', 
-              title: 'Top-Up Successful!', 
-              message: `UGx ${amount.toFixed(2)} added to your balance.` 
+
+            setAlert({
+              variant: 'success',
+              title: 'Top-Up Successful!',
+              message: `UGx ${amount.toFixed(2)} added to your balance.`
             });
-            
+
             setIsProcessing(false);
             setShowOTPModal(false);
-            
+
             setTopUpAmount('');
             setTransactionUuid('');
             return;
           } else if (txStatus === 'failed' || txStatus === 'cancelled') {
-            setAlert({ 
-              variant: 'error', 
-              title: 'Payment Failed', 
-              message: 'Payment was declined or cancelled. Please try again.' 
+            setAlert({
+              variant: 'error',
+              title: 'Payment Failed',
+              message: 'Payment was declined or cancelled. Please try again.'
             });
-            
+
             setIsProcessing(false);
             setShowOTPModal(false);
             setTopUpAmount('');
@@ -308,10 +281,10 @@ export default function AutoTopUp() {
             if (attempts < maxAttempts) {
               setTimeout(checkStatus, 10000); // Check every 10 seconds
             } else {
-              setAlert({ 
-                variant: 'warning', 
-                title: 'Payment Pending', 
-                message: 'Payment is taking longer than expected. Please check your transaction history.' 
+              setAlert({
+                variant: 'warning',
+                title: 'Payment Pending',
+                message: 'Payment is taking longer than expected. Please check your transaction history.'
               });
               setIsProcessing(false);
               setShowOTPModal(false);
@@ -323,10 +296,10 @@ export default function AutoTopUp() {
           if (attempts < maxAttempts) {
             setTimeout(checkStatus, 10000);
           } else {
-            setAlert({ 
-              variant: 'error', 
-              title: 'Verification Error', 
-              message: 'Could not verify payment status. Please check your transaction history.' 
+            setAlert({
+              variant: 'error',
+              title: 'Verification Error',
+              message: 'Could not verify payment status. Please check your transaction history.'
             });
             setIsProcessing(false);
             setShowOTPModal(false);
@@ -337,17 +310,17 @@ export default function AutoTopUp() {
         if (attempts < maxAttempts) {
           setTimeout(checkStatus, 10000);
         } else {
-          setAlert({ 
-            variant: 'error', 
-            title: 'Verification Error', 
-            message: 'Could not verify payment status. Please check your transaction history.' 
+          setAlert({
+            variant: 'error',
+            title: 'Verification Error',
+            message: 'Could not verify payment status. Please check your transaction history.'
           });
           setIsProcessing(false);
           setShowOTPModal(false);
         }
       }
     };
-    
+
     // Start polling after 5 seconds (give time for payment to be initiated)
     setTimeout(checkStatus, 5000);
   };
@@ -421,7 +394,7 @@ export default function AutoTopUp() {
               </div>
             </div>
             <div>
-                
+
             </div>
             <div className="flex items-center gap-3">
               <Button variant="outline" onClick={() => setShowNumberModal(true)} className="bg-white/15 text-white border-white/30 hover:bg-white/25">
@@ -440,11 +413,10 @@ export default function AutoTopUp() {
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`flex-1 px-6 py-3 text-sm font-medium transition-all ${
-                activeTab === tab
-                  ? 'border-b-2 border-brand-600 text-brand-600 dark:text-brand-400'
-                  : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
-              }`}
+              className={`flex-1 px-6 py-3 text-sm font-medium transition-all ${activeTab === tab
+                ? 'border-b-2 border-brand-600 text-brand-600 dark:text-brand-400'
+                : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                }`}
             >
               {tab === 'topup' ? (
                 <span className="flex items-center justify-center gap-2">
@@ -509,42 +481,39 @@ export default function AutoTopUp() {
               transactions.map((tx, i) => (
                 <div
                   key={tx.id}
-                  className={`flex items-center justify-between rounded-xl border p-4 transition-all ${
-                    tx.status === 'completed'
-                      ? 'border-green-200 bg-green-50/50 dark:border-green-900/30 dark:bg-green-900/10'
-                      : tx.status === 'pending'
+                  className={`flex items-center justify-between rounded-xl border p-4 transition-all ${tx.status === 'completed'
+                    ? 'border-green-200 bg-green-50/50 dark:border-green-900/30 dark:bg-green-900/10'
+                    : tx.status === 'pending'
                       ? 'border-yellow-200 bg-yellow-50/50 dark:border-yellow-900/30 dark:bg-yellow-900/10'
                       : 'border-red-200 bg-red-50/50 dark:border-red-900/30 dark:bg-red-900/10'
-                  } animate-slide-up`}
+                    } animate-slide-up`}
                   style={{ animationDelay: `${i * 100}ms` }}
                 >
                   <div className="flex items-center gap-3">
-                    <div className={`rounded-full p-2 ${
-                      tx.status === 'completed' ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400' :
+                    <div className={`rounded-full p-2 ${tx.status === 'completed' ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400' :
                       tx.status === 'pending' ? 'bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400' :
-                      'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'
-                    }`}>
+                        'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'
+                      }`}>
                       {tx.status === 'completed' ? <CheckCircle className="h-5 w-5" /> :
-                       tx.status === 'pending' ? <Clock className="h-5 w-5" /> :
-                       <XCircle className="h-5 w-5" />}
+                        tx.status === 'pending' ? <Clock className="h-5 w-5" /> :
+                          <XCircle className="h-5 w-5" />}
                     </div>
                     <div>
                       <p className="font-semibold text-gray-900 dark:text-white">
-                        {tx.transaction_type === 'credit' ? '+' : '-'}{tx.currency} {tx.amount.toFixed(2)}
+                        {tx.transactionType === 'credit' ? '+' : '-'}{tx.currency} {tx.amount.toFixed(2)}
                       </p>
                       <p className="text-xs text-gray-500 dark:text-gray-400">
-                        {tx.payment_method} • {new Date(tx.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        {tx.paymentMethod} • {new Date(tx.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                       </p>
                       <p className="text-xs text-gray-600 dark:text-gray-500 mt-0.5">
                         {tx.description}
                       </p>
                     </div>
                   </div>
-                  <span className={`rounded-full px-3 py-1 text-xs font-medium ${
-                    tx.status === 'completed' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' :
+                  <span className={`rounded-full px-3 py-1 text-xs font-medium ${tx.status === 'completed' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' :
                     tx.status === 'pending' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300' :
-                    'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
-                  }`}>
+                      'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+                    }`}>
                     {tx.status.charAt(0).toUpperCase() + tx.status.slice(1)}
                   </span>
                 </div>
@@ -582,9 +551,25 @@ export default function AutoTopUp() {
                     onChange={(e) => setTopUpAmount(e.target.value)}
                     className="pl-10"
                     min="1"
-                    // step="0.01"
+                  // step="0.01"
                   />
                 </div>
+                {topUpAmount && !isNaN(parseFloat(topUpAmount)) && (
+                  <div className="mt-3 space-y-2 rounded-lg bg-gray-50 p-3 text-sm dark:bg-white/5">
+                    <div className="flex justify-between text-gray-600 dark:text-gray-400">
+                      <span>Amount:</span>
+                      <span>UGx {Math.round(parseFloat(topUpAmount)).toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between text-gray-600 dark:text-gray-400">
+                      <span>Service Fee (5%):</span>
+                      <span>UGx {Math.round(Math.round(parseFloat(topUpAmount)) * 0.10).toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between border-t border-gray-200 pt-2 font-semibold text-gray-900 dark:border-gray-700 dark:text-white">
+                      <span>Total to Pay:</span>
+                      <span>UGx {(Math.round(parseFloat(topUpAmount)) + Math.round(Math.round(parseFloat(topUpAmount)) * 0.10)).toLocaleString()}</span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="flex gap-3">

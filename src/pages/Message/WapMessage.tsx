@@ -31,7 +31,7 @@ import Button from "../../components/ui/button/Button";
 import { Modal } from "../../components/ui/modal";
 import useCustomToast from "../../hooks/useCustomToast";
 import { TrashBinIcon } from "../../icons";
-import type { ContactGroupsPublic, TemplatePublic, TemplatesPublic } from "../../lib/api";
+import type { ContactGroupsPublic, TemplatePublic, TemplatesPublic, BulkSmsJobCreate } from "../../lib/api";
 import { apiClient } from "../../lib/api/client";
 
 // ──────────────────────────────────────────────────────────────────────
@@ -115,7 +115,7 @@ const ColorVariants = [
 // ──────────────────────────────────────────────────────────────────────
 // Main Component
 // ──────────────────────────────────────────────────────────────────────
-export default function ComposePage() {
+export default function WapMessagePage() {
   const { showSuccessToast, showErrorToast } = useCustomToast();
   const [groups, setGroups] = useState<ContactGroup[]>([]);
   const [totalContacts, setTotalContacts] = useState<number>(0);
@@ -141,6 +141,7 @@ export default function ComposePage() {
   const templatesScrollerRef = useRef<HTMLDivElement>(null);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [senderId, setSenderId] = useState<string>("");
+  const [batchSize, setBatchSize] = useState(100);
 
   // Helpers: API error handling
   const isAuthError = (err: unknown) => {
@@ -321,7 +322,7 @@ export default function ComposePage() {
     staleTime: 60_000,
   });
 
-  
+
 
   const importContactsFromGroup = useCallback(async (backendGroupId: string) => {
     // Fetch contacts for selected backend group (paginate if needed)
@@ -557,19 +558,35 @@ export default function ComposePage() {
 
     setIsSending(true);
     try {
-      await apiClient.api.sms.smsSendSms({
-        sendSMSRequest: {
-          to,
-          message: finalMessage,
-          templateId: selectedTemplateId || undefined,
-          from: sid,
-          enqueue: true,
-        },
-      });
-      if (invalid > 0) {
-        showSuccessToast(`Queued ${to.length} SMS. Skipped ${invalid} invalid number(s).`);
+      // Use Bulk Job for large numbers or if explicitly requested (logic can be refined)
+      // For now, if recipients > 50, use Bulk Job
+      if (to.length > 50) {
+        await apiClient.api.sms.smsCreateBulkSmsJob({
+          bulkSmsJobCreate: {
+            name: `Campaign ${new Date().toLocaleString()}`,
+            recipients: to,
+            message: finalMessage,
+            senderId: sid,
+            templateId: selectedTemplateId,
+            batchSize: batchSize,
+          }
+        });
+        showSuccessToast(`Bulk Job Created for ${to.length} recipients.`);
       } else {
-        showSuccessToast(`Queued SMS to ${to.length} recipient(s).`);
+        await apiClient.api.sms.smsSendSms({
+          sendSMSRequest: {
+            to,
+            message: finalMessage,
+            templateId: selectedTemplateId || undefined,
+            from: sid,
+            enqueue: true,
+          },
+        });
+        if (invalid > 0) {
+          showSuccessToast(`Queued ${to.length} SMS. Skipped ${invalid} invalid number(s).`);
+        } else {
+          showSuccessToast(`Queued SMS to ${to.length} recipient(s).`);
+        }
       }
 
       // Reset state
@@ -705,11 +722,10 @@ export default function ComposePage() {
                         <div
                           key={group.id}
                           onClick={() => toggleGroupSelection(group.id)}
-                          className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${
-                            isSelected
-                              ? `${color.border} `
-                              : "border-gray-200 dark:border-gray-700 bg-transparent   hover:border-gray-300"
-                          }`}
+                          className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${isSelected
+                            ? `${color.border} `
+                            : "border-gray-200 dark:border-gray-700 bg-transparent   hover:border-gray-300"
+                            }`}
                         >
                           <div className="flex items-center justify-between mb-1">
                             <span
@@ -946,9 +962,8 @@ export default function ComposePage() {
           <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-lg w-full p-6">
             <div
               {...getRootProps()}
-              className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors ${
-                isDragActive ? "border-brand-500" : "border-gray-600 "
-              }`}
+              className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors ${isDragActive ? "border-brand-500" : "border-gray-600 "
+                }`}
             >
               {/* <Input {...getInputProps()} /> */}
               <CloudUploadIcon className="w-12 h-12 mx-auto text-gray-400 mb-4" />
@@ -1039,7 +1054,7 @@ export default function ComposePage() {
                   key={g.id}
                   onClick={() => { setSelectedBatchId(g.id); setShowChooseBatch(false); }}
                   disabled={g.contacts.length >= CHUNK_SIZE}
-                  className={`w-full text-left p-3 rounded border ${selectedBatchId===g.id?"border-brand-500":"border-gray-300 dark:border-gray-700"} ${g.contacts.length>=CHUNK_SIZE?"opacity-50 cursor-not-allowed":"hover:bg-gray-50 dark:hover:bg-white/5"}`}
+                  className={`w-full text-left p-3 rounded border ${selectedBatchId === g.id ? "border-brand-500" : "border-gray-300 dark:border-gray-700"} ${g.contacts.length >= CHUNK_SIZE ? "opacity-50 cursor-not-allowed" : "hover:bg-gray-50 dark:hover:bg-white/5"}`}
                 >
                   <div className="flex items-center justify-between">
                     <span className="font-medium">Batch {g.number}</span>
@@ -1265,11 +1280,10 @@ export default function ComposePage() {
                 return (
                   <div
                     key={item.id}
-                    className={`p-4 rounded-xl border-2 ${
-                      isSingle
-                        ? "border-green-300 bg-green-50"
-                        : `${color.border} ${color.bg}`
-                    }`}
+                    className={`p-4 rounded-xl border-2 ${isSingle
+                      ? "border-green-300 bg-green-50"
+                      : `${color.border} ${color.bg}`
+                      }`}
                   >
                     <div className="flex justify-between mb-2">
                       <p className="font-medium">
@@ -1292,11 +1306,10 @@ export default function ComposePage() {
                     )}
                     <div className="mt-2 w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                       <div
-                        className={`h-full rounded-full transition-all ${
-                          item.status === "completed"
-                            ? "bg-green-600"
-                            : "bg-brand-600"
-                        }`}
+                        className={`h-full rounded-full transition-all ${item.status === "completed"
+                          ? "bg-green-600"
+                          : "bg-brand-600"
+                          }`}
                         style={{ width: `${item.progress}%` }}
                       />
                     </div>

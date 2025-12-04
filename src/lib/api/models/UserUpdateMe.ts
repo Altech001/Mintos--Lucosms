@@ -31,6 +31,12 @@ export interface UserUpdateMe {
      * @memberof UserUpdateMe
      */
     email?: string | null;
+    /**
+     * 
+     * @type {string}
+     * @memberof UserUpdateMe
+     */
+    phone?: string | null;
 }
 
 /**
@@ -52,6 +58,7 @@ export function UserUpdateMeFromJSONTyped(json: any, ignoreDiscriminator: boolea
         
         'fullName': json['full_name'] == null ? undefined : json['full_name'],
         'email': json['email'] == null ? undefined : json['email'],
+        'phone': json['phone'] == null ? undefined : json['phone'],
     };
 }
 
@@ -68,6 +75,7 @@ export function UserUpdateMeToJSONTyped(value?: UserUpdateMe | null, ignoreDiscr
         
         'full_name': value['fullName'],
         'email': value['email'],
+        'phone': value['phone'],
     };
 }
 

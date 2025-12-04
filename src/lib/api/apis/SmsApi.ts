@@ -15,11 +15,20 @@
 
 import * as runtime from '../runtime';
 import type {
+  BulkSmsJobCreate,
+  BulkSmsJobPublic,
+  BulkSmsJobsPublic,
   HTTPValidationError,
   SendSMSRequest,
   SendSMSResponse,
 } from '../models/index';
 import {
+    BulkSmsJobCreateFromJSON,
+    BulkSmsJobCreateToJSON,
+    BulkSmsJobPublicFromJSON,
+    BulkSmsJobPublicToJSON,
+    BulkSmsJobsPublicFromJSON,
+    BulkSmsJobsPublicToJSON,
     HTTPValidationErrorFromJSON,
     HTTPValidationErrorToJSON,
     SendSMSRequestFromJSON,
@@ -28,11 +37,38 @@ import {
     SendSMSResponseToJSON,
 } from '../models/index';
 
+export interface SmsCreateBulkSmsJobRequest {
+    bulkSmsJobCreate: BulkSmsJobCreate;
+}
+
 export interface SmsDeliveryReportWebhookRequest {
     requestBody: { [key: string]: any; };
 }
 
+export interface SmsGetBulkJobRequest {
+    jobId: string;
+}
+
+export interface SmsGetBulkJobsRequest {
+    skip?: number;
+    limit?: number;
+    status?: string | null;
+}
+
+export interface SmsPauseBulkJobRequest {
+    jobId: string;
+}
+
+export interface SmsResumeBulkJobRequest {
+    jobId: string;
+}
+
 export interface SmsSendSmsRequest {
+    sendSMSRequest: SendSMSRequest;
+}
+
+export interface SmsSendSmsApiRequest {
+    xApiKey: string;
     sendSMSRequest: SendSMSRequest;
 }
 
@@ -44,7 +80,23 @@ export interface SmsSendSmsRequest {
  */
 export interface SmsApiInterface {
     /**
-     * Set this URL in Africa\'s Talking dashboard: https://yourdomain.com/api/v1/sms/webhook/delivery-reports
+     * Create a bulk SMS job for large-scale sending (handles millions of messages). Returns immediately with job ID. Processing happens in background.
+     * @summary Create Bulk Sms Job
+     * @param {BulkSmsJobCreate} bulkSmsJobCreate 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof SmsApiInterface
+     */
+    smsCreateBulkSmsJobRaw(requestParameters: SmsCreateBulkSmsJobRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<BulkSmsJobPublic>>;
+
+    /**
+     * Create a bulk SMS job for large-scale sending (handles millions of messages). Returns immediately with job ID. Processing happens in background.
+     * Create Bulk Sms Job
+     */
+    smsCreateBulkSmsJob(requestParameters: SmsCreateBulkSmsJobRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<BulkSmsJobPublic>;
+
+    /**
+     * https://yourdomain.com/api/v1/sms/webhook/delivery-reports
      * @summary Delivery Report Webhook
      * @param {{ [key: string]: any; }} requestBody 
      * @param {*} [options] Override http request option.
@@ -54,13 +106,79 @@ export interface SmsApiInterface {
     smsDeliveryReportWebhookRaw(requestParameters: SmsDeliveryReportWebhookRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<any>>;
 
     /**
-     * Set this URL in Africa\'s Talking dashboard: https://yourdomain.com/api/v1/sms/webhook/delivery-reports
+     * https://yourdomain.com/api/v1/sms/webhook/delivery-reports
      * Delivery Report Webhook
      */
     smsDeliveryReportWebhook(requestParameters: SmsDeliveryReportWebhookRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<any>;
 
     /**
-     * Send SMS with: - Wallet deduction - Transaction + SMS history logging - Template support - Real-time delivery via WebSocket - No Celery needed
+     * Get status of a specific bulk SMS job.
+     * @summary Get Bulk Job
+     * @param {string} jobId 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof SmsApiInterface
+     */
+    smsGetBulkJobRaw(requestParameters: SmsGetBulkJobRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<BulkSmsJobPublic>>;
+
+    /**
+     * Get status of a specific bulk SMS job.
+     * Get Bulk Job
+     */
+    smsGetBulkJob(requestParameters: SmsGetBulkJobRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<BulkSmsJobPublic>;
+
+    /**
+     * Get all bulk SMS jobs for the current user.
+     * @summary Get Bulk Jobs
+     * @param {number} [skip] 
+     * @param {number} [limit] 
+     * @param {string} [status] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof SmsApiInterface
+     */
+    smsGetBulkJobsRaw(requestParameters: SmsGetBulkJobsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<BulkSmsJobsPublic>>;
+
+    /**
+     * Get all bulk SMS jobs for the current user.
+     * Get Bulk Jobs
+     */
+    smsGetBulkJobs(requestParameters: SmsGetBulkJobsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<BulkSmsJobsPublic>;
+
+    /**
+     * Pause a running bulk SMS job.
+     * @summary Pause Bulk Job
+     * @param {string} jobId 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof SmsApiInterface
+     */
+    smsPauseBulkJobRaw(requestParameters: SmsPauseBulkJobRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<any>>;
+
+    /**
+     * Pause a running bulk SMS job.
+     * Pause Bulk Job
+     */
+    smsPauseBulkJob(requestParameters: SmsPauseBulkJobRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<any>;
+
+    /**
+     * Resume a paused bulk SMS job.
+     * @summary Resume Bulk Job
+     * @param {string} jobId 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof SmsApiInterface
+     */
+    smsResumeBulkJobRaw(requestParameters: SmsResumeBulkJobRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<any>>;
+
+    /**
+     * Resume a paused bulk SMS job.
+     * Resume Bulk Job
+     */
+    smsResumeBulkJob(requestParameters: SmsResumeBulkJobRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<any>;
+
+    /**
+     * Send SMS (Session Auth).
      * @summary Send Sms
      * @param {SendSMSRequest} sendSMSRequest 
      * @param {*} [options] Override http request option.
@@ -70,10 +188,27 @@ export interface SmsApiInterface {
     smsSendSmsRaw(requestParameters: SmsSendSmsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<SendSMSResponse>>;
 
     /**
-     * Send SMS with: - Wallet deduction - Transaction + SMS history logging - Template support - Real-time delivery via WebSocket - No Celery needed
+     * Send SMS (Session Auth).
      * Send Sms
      */
     smsSendSms(requestParameters: SmsSendSmsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<SendSMSResponse>;
+
+    /**
+     * Send SMS (API Key Auth).
+     * @summary Send Sms Api
+     * @param {string} xApiKey 
+     * @param {SendSMSRequest} sendSMSRequest 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof SmsApiInterface
+     */
+    smsSendSmsApiRaw(requestParameters: SmsSendSmsApiRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<SendSMSResponse>>;
+
+    /**
+     * Send SMS (API Key Auth).
+     * Send Sms Api
+     */
+    smsSendSmsApi(requestParameters: SmsSendSmsApiRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<SendSMSResponse>;
 
 }
 
@@ -83,7 +218,53 @@ export interface SmsApiInterface {
 export class SmsApi extends runtime.BaseAPI implements SmsApiInterface {
 
     /**
-     * Set this URL in Africa\'s Talking dashboard: https://yourdomain.com/api/v1/sms/webhook/delivery-reports
+     * Create a bulk SMS job for large-scale sending (handles millions of messages). Returns immediately with job ID. Processing happens in background.
+     * Create Bulk Sms Job
+     */
+    async smsCreateBulkSmsJobRaw(requestParameters: SmsCreateBulkSmsJobRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<BulkSmsJobPublic>> {
+        if (requestParameters['bulkSmsJobCreate'] == null) {
+            throw new runtime.RequiredError(
+                'bulkSmsJobCreate',
+                'Required parameter "bulkSmsJobCreate" was null or undefined when calling smsCreateBulkSmsJob().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+        if (this.configuration && this.configuration.accessToken) {
+            // oauth required
+            headerParameters["Authorization"] = await this.configuration.accessToken("OAuth2PasswordBearer", []);
+        }
+
+
+        let urlPath = `/api/v1/sms/send-bulk`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: BulkSmsJobCreateToJSON(requestParameters['bulkSmsJobCreate']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => BulkSmsJobPublicFromJSON(jsonValue));
+    }
+
+    /**
+     * Create a bulk SMS job for large-scale sending (handles millions of messages). Returns immediately with job ID. Processing happens in background.
+     * Create Bulk Sms Job
+     */
+    async smsCreateBulkSmsJob(requestParameters: SmsCreateBulkSmsJobRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<BulkSmsJobPublic> {
+        const response = await this.smsCreateBulkSmsJobRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * https://yourdomain.com/api/v1/sms/webhook/delivery-reports
      * Delivery Report Webhook
      */
     async smsDeliveryReportWebhookRaw(requestParameters: SmsDeliveryReportWebhookRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<any>> {
@@ -119,7 +300,7 @@ export class SmsApi extends runtime.BaseAPI implements SmsApiInterface {
     }
 
     /**
-     * Set this URL in Africa\'s Talking dashboard: https://yourdomain.com/api/v1/sms/webhook/delivery-reports
+     * https://yourdomain.com/api/v1/sms/webhook/delivery-reports
      * Delivery Report Webhook
      */
     async smsDeliveryReportWebhook(requestParameters: SmsDeliveryReportWebhookRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<any> {
@@ -128,7 +309,195 @@ export class SmsApi extends runtime.BaseAPI implements SmsApiInterface {
     }
 
     /**
-     * Send SMS with: - Wallet deduction - Transaction + SMS history logging - Template support - Real-time delivery via WebSocket - No Celery needed
+     * Get status of a specific bulk SMS job.
+     * Get Bulk Job
+     */
+    async smsGetBulkJobRaw(requestParameters: SmsGetBulkJobRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<BulkSmsJobPublic>> {
+        if (requestParameters['jobId'] == null) {
+            throw new runtime.RequiredError(
+                'jobId',
+                'Required parameter "jobId" was null or undefined when calling smsGetBulkJob().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        if (this.configuration && this.configuration.accessToken) {
+            // oauth required
+            headerParameters["Authorization"] = await this.configuration.accessToken("OAuth2PasswordBearer", []);
+        }
+
+
+        let urlPath = `/api/v1/sms/bulk-jobs/{job_id}`;
+        urlPath = urlPath.replace(`{${"job_id"}}`, encodeURIComponent(String(requestParameters['jobId'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => BulkSmsJobPublicFromJSON(jsonValue));
+    }
+
+    /**
+     * Get status of a specific bulk SMS job.
+     * Get Bulk Job
+     */
+    async smsGetBulkJob(requestParameters: SmsGetBulkJobRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<BulkSmsJobPublic> {
+        const response = await this.smsGetBulkJobRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Get all bulk SMS jobs for the current user.
+     * Get Bulk Jobs
+     */
+    async smsGetBulkJobsRaw(requestParameters: SmsGetBulkJobsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<BulkSmsJobsPublic>> {
+        const queryParameters: any = {};
+
+        if (requestParameters['skip'] != null) {
+            queryParameters['skip'] = requestParameters['skip'];
+        }
+
+        if (requestParameters['limit'] != null) {
+            queryParameters['limit'] = requestParameters['limit'];
+        }
+
+        if (requestParameters['status'] != null) {
+            queryParameters['status'] = requestParameters['status'];
+        }
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        if (this.configuration && this.configuration.accessToken) {
+            // oauth required
+            headerParameters["Authorization"] = await this.configuration.accessToken("OAuth2PasswordBearer", []);
+        }
+
+
+        let urlPath = `/api/v1/sms/bulk-jobs`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => BulkSmsJobsPublicFromJSON(jsonValue));
+    }
+
+    /**
+     * Get all bulk SMS jobs for the current user.
+     * Get Bulk Jobs
+     */
+    async smsGetBulkJobs(requestParameters: SmsGetBulkJobsRequest = {}, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<BulkSmsJobsPublic> {
+        const response = await this.smsGetBulkJobsRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Pause a running bulk SMS job.
+     * Pause Bulk Job
+     */
+    async smsPauseBulkJobRaw(requestParameters: SmsPauseBulkJobRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<any>> {
+        if (requestParameters['jobId'] == null) {
+            throw new runtime.RequiredError(
+                'jobId',
+                'Required parameter "jobId" was null or undefined when calling smsPauseBulkJob().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        if (this.configuration && this.configuration.accessToken) {
+            // oauth required
+            headerParameters["Authorization"] = await this.configuration.accessToken("OAuth2PasswordBearer", []);
+        }
+
+
+        let urlPath = `/api/v1/sms/bulk-jobs/{job_id}/pause`;
+        urlPath = urlPath.replace(`{${"job_id"}}`, encodeURIComponent(String(requestParameters['jobId'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        if (this.isJsonMime(response.headers.get('content-type'))) {
+            return new runtime.JSONApiResponse<any>(response);
+        } else {
+            return new runtime.TextApiResponse(response) as any;
+        }
+    }
+
+    /**
+     * Pause a running bulk SMS job.
+     * Pause Bulk Job
+     */
+    async smsPauseBulkJob(requestParameters: SmsPauseBulkJobRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<any> {
+        const response = await this.smsPauseBulkJobRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Resume a paused bulk SMS job.
+     * Resume Bulk Job
+     */
+    async smsResumeBulkJobRaw(requestParameters: SmsResumeBulkJobRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<any>> {
+        if (requestParameters['jobId'] == null) {
+            throw new runtime.RequiredError(
+                'jobId',
+                'Required parameter "jobId" was null or undefined when calling smsResumeBulkJob().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        if (this.configuration && this.configuration.accessToken) {
+            // oauth required
+            headerParameters["Authorization"] = await this.configuration.accessToken("OAuth2PasswordBearer", []);
+        }
+
+
+        let urlPath = `/api/v1/sms/bulk-jobs/{job_id}/resume`;
+        urlPath = urlPath.replace(`{${"job_id"}}`, encodeURIComponent(String(requestParameters['jobId'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        if (this.isJsonMime(response.headers.get('content-type'))) {
+            return new runtime.JSONApiResponse<any>(response);
+        } else {
+            return new runtime.TextApiResponse(response) as any;
+        }
+    }
+
+    /**
+     * Resume a paused bulk SMS job.
+     * Resume Bulk Job
+     */
+    async smsResumeBulkJob(requestParameters: SmsResumeBulkJobRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<any> {
+        const response = await this.smsResumeBulkJobRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Send SMS (Session Auth).
      * Send Sms
      */
     async smsSendSmsRaw(requestParameters: SmsSendSmsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<SendSMSResponse>> {
@@ -165,11 +534,63 @@ export class SmsApi extends runtime.BaseAPI implements SmsApiInterface {
     }
 
     /**
-     * Send SMS with: - Wallet deduction - Transaction + SMS history logging - Template support - Real-time delivery via WebSocket - No Celery needed
+     * Send SMS (Session Auth).
      * Send Sms
      */
     async smsSendSms(requestParameters: SmsSendSmsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<SendSMSResponse> {
         const response = await this.smsSendSmsRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Send SMS (API Key Auth).
+     * Send Sms Api
+     */
+    async smsSendSmsApiRaw(requestParameters: SmsSendSmsApiRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<SendSMSResponse>> {
+        if (requestParameters['xApiKey'] == null) {
+            throw new runtime.RequiredError(
+                'xApiKey',
+                'Required parameter "xApiKey" was null or undefined when calling smsSendSmsApi().'
+            );
+        }
+
+        if (requestParameters['sendSMSRequest'] == null) {
+            throw new runtime.RequiredError(
+                'sendSMSRequest',
+                'Required parameter "sendSMSRequest" was null or undefined when calling smsSendSmsApi().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+        if (requestParameters['xApiKey'] != null) {
+            headerParameters['x-api-key'] = String(requestParameters['xApiKey']);
+        }
+
+
+        let urlPath = `/api/v1/sms/send-api`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: SendSMSRequestToJSON(requestParameters['sendSMSRequest']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => SendSMSResponseFromJSON(jsonValue));
+    }
+
+    /**
+     * Send SMS (API Key Auth).
+     * Send Sms Api
+     */
+    async smsSendSmsApi(requestParameters: SmsSendSmsApiRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<SendSMSResponse> {
+        const response = await this.smsSendSmsApiRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

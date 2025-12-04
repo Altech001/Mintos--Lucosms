@@ -6,70 +6,37 @@ import { MessageSquare } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../../context/AuthContext";
 
-interface SmsHistory {
-  id: string;
-  recipient: string;
-  message: string;
-  status: string;
-  sms_count: number;
-  cost: number;
-  template_id: string | null;
-  error_message: string | null;
-  delivery_status: string;
-  external_id: string | null;
-  created_at: string;
-  updated_at: string;
-  sent_at: string | null;
-  delivered_at: string | null;
-  user_id: string;
-}
-
-interface SmsHistoryResponse {
-  data: SmsHistory[];
-  count: number;
-}
+import { apiClient } from '@/lib/api/client';
+import { SmsHistoryPublic } from '@/lib/api/models';
 
 export default function NotificationDropdown() {
-  const { user, apiClient } = useAuth();
+  const { user } = useAuth();
   const isAdmin = !!user?.isSuperuser;
   const [isOpen, setIsOpen] = useState(false);
 
   // Fetch recent SMS history
-  const fetchRecentSms = async (): Promise<SmsHistory[]> => {
-    const token = apiClient.getToken();
-    if (!token) return [];
-
-    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-    const endpoint = isAdmin 
-      ? `${baseUrl}/api/v1/historysms/all?skip=0&limit=6`
-      : `${baseUrl}/api/v1/historysms/?skip=0&limit=6`;
-
-    const response = await fetch(endpoint, {
-      headers: {
-        'accept': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-    });
-
-    if (!response.ok) {
-      return [];
+  const fetchRecentSms = async (): Promise<SmsHistoryPublic[]> => {
+    if (isAdmin) {
+      const response = await apiClient.api.historySms.historysmsListAllSmsHistory({ skip: 0, limit: 6 });
+      return response.data;
+    } else {
+      const response = await apiClient.api.historySms.historysmsListMySmsHistory({ skip: 0, limit: 6 });
+      return response.data;
     }
-
-    const result: SmsHistoryResponse = await response.json();
-    return result.data;
   };
 
   const { data: notifications = [] } = useQuery({
     queryKey: ['recentNotifications', user?.id, isAdmin],
     queryFn: fetchRecentSms,
+    enabled: !!user,
     staleTime: 30_000,
     refetchInterval: 60_000, // Refetch every minute
   });
 
   // Check if there are any new notifications (created in last 5 minutes)
   const hasNewNotifications = useMemo(() => {
-    const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
-    return notifications.some(n => new Date(n.created_at).getTime() > fiveMinutesAgo);
+    const fiveMinutesAgo = Date.now() - 5 * 5 * 1000;
+    return notifications.some(n => new Date(n.createdAt).getTime() > fiveMinutesAgo);
   }, [notifications]);
 
   function toggleDropdown() {
@@ -97,17 +64,20 @@ export default function NotificationDropdown() {
     const diffMs = now.getTime() - date.getTime();
     const diffMins = Math.floor(diffMs / 60000);
     const diffHours = Math.floor(diffMs / 3600000);
-    
+
     if (diffMins < 1) return 'Just now';
     if (diffMins < 60) return `${diffMins} min ago`;
     if (diffHours < 24) return `${diffHours} hr${diffHours > 1 ? 's' : ''} ago`;
     return date.toLocaleDateString();
   };
 
-  const getNotificationMessage = (notification: SmsHistory) => {
-    if (notification.delivery_status === 'delivered') {
+  const getNotificationMessage = (notification: SmsHistoryPublic) => {
+    const deliveryStatus = notification.deliveryStatus?.toLowerCase() || '';
+    const status = notification.status?.toLowerCase() || '';
+
+    if (deliveryStatus === 'delivered') {
       return `SMS delivered to ${notification.recipient}`;
-    } else if (notification.delivery_status === 'failed' || notification.status === 'failed') {
+    } else if (deliveryStatus === 'failed' || status === 'failed') {
       return `Failed to send SMS to ${notification.recipient}`;
     } else {
       return `SMS sent to ${notification.recipient}`;
@@ -146,7 +116,19 @@ export default function NotificationDropdown() {
         className="absolute -right-[240px] mt-[17px] flex h-[480px] w-[350px] flex-col rounded-2xl border border-gray-200 bg-white p-3 shadow-theme-lg dark:border-gray-800 dark:bg-gray-dark sm:w-[361px] lg:right-0"
       >
         <div className="flex items-center justify-between pb-3 mb-2 border-gray-100 dark:border-gray-700">
-          <div></div>
+          <div>
+            <div>
+
+              {hasNewNotifications && (
+                <span className="absolute right-0 top-0.5 z-10 h-2 w-2 rounded-full bg-orange-400 flex">
+                  <span className="absolute inline-flex w-full h-full bg-orange-400 rounded-full opacity-75 animate-ping">
+                  </span>
+                  {notifications.length}
+                </span>
+              )}
+
+            </div>
+          </div>
           <button
             onClick={toggleDropdown}
             className="text-gray-500 transition dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
@@ -191,9 +173,9 @@ export default function NotificationDropdown() {
                     </p>
 
                     <div className="flex items-center gap-2 mt-1">
-                      <span className={`w-2 h-2 rounded-full ${getStatusColor(notification.delivery_status, notification.status)}`}></span>
+                      <span className={`w-2 h-2 rounded-full ${getStatusColor(notification.deliveryStatus || '', notification.status || '')}`}></span>
                       <span className="text-xs text-gray-500 dark:text-gray-400">
-                        {formatTimeAgo(notification.created_at)}
+                        {formatTimeAgo(notification.createdAt.toString())}
                       </span>
                     </div>
                   </div>

@@ -66,6 +66,12 @@ export interface UserPublic {
      * @type {string}
      * @memberof UserPublic
      */
+    phone?: string | null;
+    /**
+     * 
+     * @type {string}
+     * @memberof UserPublic
+     */
     id: string;
 }
 
@@ -95,6 +101,7 @@ export function UserPublicFromJSONTyped(json: any, ignoreDiscriminator: boolean)
         'planSub': json['plan_sub'] == null ? undefined : json['plan_sub'],
         'wallet': json['wallet'] == null ? undefined : json['wallet'],
         'smsCost': json['sms_cost'] == null ? undefined : json['sms_cost'],
+        'phone': json['phone'] == null ? undefined : json['phone'],
         'id': json['id'],
     };
 }
@@ -117,6 +124,7 @@ export function UserPublicToJSONTyped(value?: UserPublic | null, ignoreDiscrimin
         'plan_sub': value['planSub'],
         'wallet': value['wallet'],
         'sms_cost': value['smsCost'],
+        'phone': value['phone'],
         'id': value['id'],
     };
 }

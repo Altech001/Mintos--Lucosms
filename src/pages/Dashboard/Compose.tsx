@@ -145,6 +145,8 @@ export default function ComposePage() {
   const [senderId, setSenderId] = useState<string>("");
   const [showUseNumbersModal, setShowUseNumbersModal] = useState(false);
   const [rawNumbersInput, setRawNumbersInput] = useState("");
+  const [batchSize, setBatchSize] = useState(100);
+
 
   // Helpers: API error handling
   const isAuthError = (err: unknown) => {
@@ -595,19 +597,35 @@ export default function ComposePage() {
 
     setIsSending(true);
     try {
-      await apiClient.api.sms.smsSendSms({
-        sendSMSRequest: {
-          to,
-          message: finalMessage,
-          templateId: selectedTemplateId || undefined,
-          from: sid,
-          enqueue: true,
-        },
-      });
-      if (invalid > 0) {
-        showSuccessToast(`Queued ${to.length} SMS. Skipped ${invalid} invalid number(s).`);
+      // Use Bulk Job for large numbers or if explicitly requested (logic can be refined)
+      // For now, if recipients > 50, use Bulk Job
+      if (to.length > 50) {
+        await apiClient.api.sms.smsCreateBulkSmsJob({
+          bulkSmsJobCreate: {
+            name: `Campaign ${new Date().toLocaleString()}`,
+            recipients: to,
+            message: finalMessage,
+            senderId: sid,
+            templateId: selectedTemplateId || undefined,
+            batchSize: batchSize,
+          }
+        });
+        showSuccessToast(`Bulk Job Created for ${to.length} recipients with batch size ${batchSize}.`);
       } else {
-        showSuccessToast(`Queued SMS to ${to.length} recipient(s).`);
+        await apiClient.api.sms.smsSendSms({
+          sendSMSRequest: {
+            to,
+            message: finalMessage,
+            templateId: selectedTemplateId || undefined,
+            from: sid,
+            enqueue: true,
+          },
+        });
+        if (invalid > 0) {
+          showSuccessToast(`Queued ${to.length} SMS. Skipped ${invalid} invalid number(s).`);
+        } else {
+          showSuccessToast(`Queued SMS to ${to.length} recipient(s).`);
+        }
       }
 
       // Reset state
@@ -886,13 +904,28 @@ export default function ComposePage() {
                       </p>
                     </div>
                     <div className="float-right gap-2 flex items-center">
-                      <Input
-                        value={senderId}
-                        onChange={(e) => setSenderId(e.target.value)}
-                        placeholder="Sender ID / ATUpdates"
-
-                        maxLength={11}
-                      />
+                      <div className="flex flex-col gap-1">
+                        <label className="text-xs text-gray-500">Sender ID</label>
+                        <Input
+                          value={senderId}
+                          onChange={(e) => setSenderId(e.target.value)}
+                          placeholder="ATUpdates"
+                          maxLength={11}
+                          className="w-32"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-xs text-gray-500">Batch Size</label>
+                        <Input
+                          type="number"
+                          value={batchSize}
+                          onChange={(e) => setBatchSize(Math.max(1, Math.min(1000, parseInt(e.target.value) || 100)))}
+                          placeholder="100"
+                          min={1}
+                          max={1000}
+                          className="w-24"
+                        />
+                      </div>
                       <Button onClick={selectAllGroups} variant="outline">
                         <BrushCleaning className="w-6 h-6 text-gray-400 cursor-pointer float-right mr-2" />
                         {selectedGroups.size === groups.length

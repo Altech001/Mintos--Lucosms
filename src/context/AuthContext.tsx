@@ -5,14 +5,13 @@ import {
   useEffect,
   ReactNode,
 } from "react";
-import { apiClient, ApiClient } from "../lib/api/client";
+import { apiClient, setAuthToken, clearAuthToken } from "../lib/api/client";
 import { UserPublic } from "../lib/api/models";
 
 interface AuthContextType {
   user: UserPublic | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  apiClient: ApiClient;
   login: (email: string, password: string) => Promise<UserPublic | void>;
   register: (
     email: string,
@@ -36,7 +35,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const checkAuth = async () => {
     console.log("Attempting to check auth...");
-    const token = apiClient.getToken();
+    const token = localStorage.getItem('token');
     console.log("Token:", token);
 
     if (!token) {
@@ -46,12 +45,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     try {
       console.log("Verifying token by fetching user data...");
+      setAuthToken(token);
       const response = await apiClient.api.users.usersReadUserMe();
       console.log("Auth check successful, user data:", response);
       setUser(response);
     } catch (error) {
       console.error("Auth check failed:", error);
-      apiClient.clearToken();
+      clearAuthToken();
       setUser(null);
     } finally {
       setIsLoading(false);
@@ -66,13 +66,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         username: email,
         password: password,
       });
-      apiClient.setToken(response.accessToken);
+      setAuthToken(response.accessToken);
       const userData = await apiClient.api.users.usersReadUserMe();
       setUser(userData);
       // Return user data to confirm login was successful
       return userData;
     } catch (error: unknown) {
       console.error("Login failed:", error);
+
+      // Try to get more details from the error
+      if (error && typeof error === 'object' && 'response' in error) {
+        const responseError = error as any;
+        try {
+          const errorBody = await responseError.response.json();
+          console.error("Error response body:", errorBody);
+        } catch (e) {
+          console.error("Could not parse error response");
+        }
+      }
+
       const message =
         error instanceof Error
           ? error.message
@@ -106,7 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
-    apiClient.clearToken();
+    clearAuthToken();
     setUser(null);
   };
 
@@ -120,7 +132,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         register,
         logout,
         checkAuth,
-        apiClient,
       }}
     >
       {children}

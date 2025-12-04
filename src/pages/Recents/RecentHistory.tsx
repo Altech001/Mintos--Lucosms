@@ -7,60 +7,32 @@ import BasicTableOne from "../../components/tables/BasicTables/BasicTableOne";
 import { Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../context/AuthContext';
+import { apiClient } from '@/lib/api/client';
 
-interface SmsHistory {
-  id: string;
-  recipient: string;
-  message: string;
-  status: string;
-  sms_count: number;
-  cost: number;
-  template_id: string | null;
-  error_message: string | null;
-  delivery_status: string;
-  external_id: string | null;
-  created_at: string;
-  updated_at: string;
-  sent_at: string | null;
-  delivered_at: string | null;
-  user_id: string;
-}
+import { SmsHistoryPublic } from '@/lib/api/models';
 
-interface SmsHistoryResponse {
-  data: SmsHistory[];
-  count: number;
-}
+// Local interfaces removed, using generated models
 
 export default function RecentHistory() {
-  const { user, apiClient } = useAuth();
+  const { user, } = useAuth();
   const isAdmin = !!user?.isSuperuser;
-  
+
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
 
   // Fetch SMS history
-  const fetchSmsHistory = async (): Promise<SmsHistory[]> => {
-    const token = apiClient.getToken();
-    if (!token) return [];
+  // Fetch SMS history
+  const fetchSmsHistory = async (): Promise<SmsHistoryPublic[]> => {
+    try {
+      const response = isAdmin
+        ? await apiClient.api.historySms.historysmsListAllSmsHistory({ skip: 0, limit: 50 })
+        : await apiClient.api.historySms.historysmsListMySmsHistory({ skip: 0, limit: 50 });
 
-    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-    const endpoint = isAdmin 
-      ? `${baseUrl}/api/v1/historysms/all?skip=0&limit=50`
-      : `${baseUrl}/api/v1/historysms/?skip=0&limit=50`;
-
-    const response = await fetch(endpoint, {
-      headers: {
-        'accept': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to fetch SMS history');
+      return response.data;
+    } catch (error) {
+      console.error('Failed to fetch SMS history:', error);
+      return [];
     }
-
-    const result: SmsHistoryResponse = await response.json();
-    return result.data;
   };
 
   const { data: smsHistory = [], isLoading } = useQuery({
@@ -72,13 +44,13 @@ export default function RecentHistory() {
   // Filter SMS history based on search
   const filteredHistory = useMemo(() => {
     if (!searchTerm) return smsHistory;
-    
+
     const searchLower = searchTerm.toLowerCase();
     return smsHistory.filter(sms =>
       (sms.recipient?.toLowerCase() || '').includes(searchLower) ||
       (sms.message?.toLowerCase() || '').includes(searchLower) ||
       (sms.status?.toLowerCase() || '').includes(searchLower) ||
-      (sms.delivery_status?.toLowerCase() || '').includes(searchLower)
+      (sms.deliveryStatus?.toLowerCase() || '').includes(searchLower)
     );
   }, [smsHistory, searchTerm]);
 
@@ -94,10 +66,10 @@ export default function RecentHistory() {
       <PageBreadcrumb pageTitle="Recent History" />
 
       <div className="min-h-auto rounded-xl border border-gray-200 bg-white px-5 py-7 dark:border-gray-800 dark:bg-white/3 xl:px-10">
-        
+
         {/* Search + Pagination Bar */}
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          
+
           {/* Search Input */}
           <div className="relative max-w-xs">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -183,8 +155,8 @@ export default function RecentHistory() {
               ))}
             </div>
           ) : (
-            <BasicTableOne 
-              searchTerm="" 
+            <BasicTableOne
+              searchTerm=""
               currentPage={currentPage}
               itemsPerPage={itemsPerPage}
               smsHistory={filteredHistory}

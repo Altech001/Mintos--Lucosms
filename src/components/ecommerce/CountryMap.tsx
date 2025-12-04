@@ -109,9 +109,9 @@ const UgandaMap: React.FC<UgandaMapProps> = ({
                 <div class="flex items-center gap-1 text-xs font-semibold">
                   <span class="w-4 h-3">
                     <svg viewBox="0 0 640 480" class="w-full h-full">
+                    <rect y="320" width="640" height="160" fill="#D21034"/>
                       <rect width="640" height="480" fill="#FFD500"/>
                       <rect y="160" width="640" height="160" fill="#000"/>
-                      <rect y="320" width="640" height="160" fill="#D21034"/>
                       <circle cx="320" cy="240" r="80" fill="#fff"/>
                       <path d="M320 180v120M260 240h120" stroke="#000" strokeWidth="20"/>
                     </svg>
@@ -129,11 +129,11 @@ const UgandaMap: React.FC<UgandaMapProps> = ({
       <div className="absolute top-4 right-4 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-2 flex items-center gap-2 border border-gray-200 dark:border-gray-700">
         <div className="w-8 h-6 rounded overflow-hidden shadow">
           <svg viewBox="0 0 640 480" className="w-full h-full">
-            <rect width="640" height="480" fill="#FFD500"/>
-            <rect y="160" width="640" height="160" fill="#000"/>
-            <rect y="320" width="640" height="160" fill="#D21034"/>
-            <circle cx="320" cy="240" r="80" fill="#fff"/>
-            <path d="M320 180v120M260 240h120" stroke="#000" strokeWidth="20"/>
+            <rect width="640" height="480" fill="#D21034" />
+            <rect y="160" width="640" height="160" fill="#000" />
+            <rect y="320" width="640" height="160" fill="#FFD500" />
+            <circle cx="320" cy="240" r="80" fill="#fff" />
+            <path d="M320 180v120M260 240h120" stroke="#000" strokeWidth="20" />
           </svg>
         </div>
         <span className="text-sm font-semibold text-gray-800 dark:text-white">Uganda</span>

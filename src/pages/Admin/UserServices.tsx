@@ -1,131 +1,71 @@
 
+import { SystemStats, UserSearchResult } from '@/lib/api/models';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Activity, AlertCircle, BarChart3, CreditCard, MessageSquare, Plus, RefreshCw, Search, Users, Wallet, CheckSquare, Square, Filter, MoreVertical, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { Activity, AlertCircle, ArrowUpRight, BarChart3, CheckSquare, CreditCard, MessageSquare, Plus, RefreshCw, Search, Square, Users } from 'lucide-react';
 import { useState } from 'react';
-import ComponentCard from '../../components/common/ComponentCard';
 import Input from '../../components/form/input/InputField';
 import Button from '../../components/ui/button/Button';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import AlertDialog from '../../components/ui/modal/AlertDialog';
 
-// API Base URL
-const API_BASE_URL = import.meta.env.VITE_API_URL;
-
-// Helper for headers
-const getHeaders = () => {
-  const token = localStorage.getItem('access_token');
-  return {
-    'Authorization': `Bearer ${token}`,
-    'Content-Type': 'application/json',
-  };
-};
+import { apiClient } from '@/lib/api/client';
 
 // API Functions
 const fetchUsers = async (filters: SearchFilters) => {
-  const params = new URLSearchParams();
-  if (filters.query) params.append('query', filters.query);
-  if (filters.plan) params.append('plan', filters.plan);
-  if (filters.is_active !== null) params.append('is_active', filters.is_active.toString());
-  params.append('skip', filters.skip.toString());
-  params.append('limit', filters.limit.toString());
-
-  const response = await fetch(`${API_BASE_URL}/api/v1/admin/users/search?${params}`, {
-    headers: getHeaders(),
+  const response = await apiClient.api.admin.moreAdminPrivilegesSearchUsers({
+    query: filters.query || undefined,
+    plan: filters.plan || undefined,
+    isActive: filters.is_active,
+    skip: filters.skip,
+    limit: filters.limit
   });
-
-  if (!response.ok) {
-    throw new Error('Failed to fetch users');
-  }
-
-  return response.json();
+  return response;
 };
 
 const fetchSystemStats = async () => {
-  const response = await fetch(`${API_BASE_URL}/api/v1/admin/system/stats`, {
-    headers: getHeaders(),
-  });
-
-  if (!response.ok) {
-    throw new Error('Failed to fetch system stats');
-  }
-
-  return response.json();
+  const response = await apiClient.api.admin.moreAdminPrivilegesGetSystemStatistics();
+  return response;
 };
 
 const fetchSMSAnalytics = async (days: number = 30) => {
-  const response = await fetch(`${API_BASE_URL}/api/v1/admin/analytics/sms-overview?days=${days}`, {
-    headers: getHeaders(),
+  const response = await apiClient.api.admin.moreAdminPrivilegesGetSmsAnalytics({
+    days
   });
-
-  if (!response.ok) {
-    throw new Error('Failed to fetch SMS analytics');
-  }
-
-  return response.json();
+  return response as unknown as SMSAnalytics;
 };
 
 const addUserBalance = async ({ userId, amount, description }: { userId: string; amount: number; description: string }) => {
-  const response = await fetch(`${API_BASE_URL}/api/v1/admin/users/${userId}/add-balance`, {
-    method: 'POST',
-    headers: getHeaders(),
-    body: JSON.stringify({
-      user_id: userId,
+  const response = await apiClient.api.admin.moreAdminPrivilegesAddBalanceToUser({
+    userId,
+    addBalanceRequest: {
+      userId,
       amount,
       description,
-      payment_method: 'admin_adjustment'
-    }),
+      paymentMethod: 'admin_adjustment'
+    }
   });
-
-  if (!response.ok) {
-    throw new Error('Failed to add balance');
-  }
-
-  return response.json();
+  return response;
 };
 
 const toggleUserStatus = async ({ userId, activate }: { userId: string; activate: boolean }) => {
-  const endpoint = activate ? 'activate' : 'deactivate';
-  const response = await fetch(`${API_BASE_URL}/api/v1/admin/users/${userId}/${endpoint}`, {
-    method: 'POST',
-    headers: getHeaders(),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to ${endpoint} user`);
+  if (activate) {
+    return await apiClient.api.admin.moreAdminPrivilegesActivateUser({ userId });
+  } else {
+    return await apiClient.api.admin.moreAdminPrivilegesDeactivateUser({ userId });
   }
-
-  return response.json();
 };
 
 const bulkUpdateUserPlan = async ({ userIds, newPlan }: { userIds: string[]; newPlan: string }) => {
-  const response = await fetch(`${API_BASE_URL}/api/v1/admin/users/bulk-update-plan?new_plan=${newPlan}`, {
-    method: 'POST',
-    headers: getHeaders(),
-    body: JSON.stringify(userIds),
+  const response = await apiClient.api.admin.moreAdminPrivilegesBulkUpdateUserPlan({
+    newPlan,
+    requestBody: userIds
   });
-
-  if (!response.ok) {
-    throw new Error('Failed to update user plans');
-  }
-
-  return response.json();
+  return response;
 };
 
 // Types
-interface User {
-  id: string;
-  email: string;
-  full_name: string;
-  is_active: boolean;
-  plan_sub: string;
-  wallet: string;
-  total_sms_sent: number;
-  total_transactions: number;
-  created_at: string | null;
-  plan?: string;
-  wallet_balance?: number;
-  sms_sent?: number;
-}
+// User interface removed, using UserSearchResult
+// SystemStats interface removed, using imported SystemStats
 
 interface SearchFilters {
   query: string;
@@ -133,16 +73,6 @@ interface SearchFilters {
   is_active: boolean | null;
   skip: number;
   limit: number;
-}
-
-interface SystemStats {
-  total_users: number;
-  active_users: number;
-  total_transactions: number;
-  total_sms_sent: number;
-  total_revenue: number;
-  users_by_plan: Record<string, number>;
-  recent_signups: number;
 }
 
 interface SMSAnalytics {
@@ -179,7 +109,7 @@ function UserServices() {
   });
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [showTopupModal, setShowTopupModal] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [selectedUser, setSelectedUser] = useState<UserSearchResult | null>(null);
   const [topupAmount, setTopupAmount] = useState('');
   const [topupDescription] = useState('Admin credit adjustment');
   const [activeTab, setActiveTab] = useState('users');
@@ -194,7 +124,7 @@ function UserServices() {
   const queryClient = useQueryClient();
 
   // Real API calls
-  const { data: users = [], isLoading: usersLoading, error: usersError, refetch: refetchUsers } = useQuery<User[]>({
+  const { data: users = [], isLoading: usersLoading, error: usersError, refetch: refetchUsers } = useQuery<UserSearchResult[]>({
     queryKey: ['users', searchFilters],
     queryFn: () => fetchUsers(searchFilters),
     staleTime: 30000, // 30 seconds
@@ -224,7 +154,7 @@ function UserServices() {
       setShowTopupModal(false);
       setTopupAmount('');
       setSelectedUser(null);
-      showAlert('Success', `Balance added successfully! New balance: UGX ${data.balance_after}`, 'success');
+      showAlert('Success', `Balance added successfully! New balance: UGX ${data.balanceAfter}`, 'success');
     },
     onError: (error) => {
       showAlert('Error', `Failed to add balance: ${error.message}`, 'error');
@@ -310,10 +240,10 @@ function UserServices() {
       {activeTab === 'analytics' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {[
-            { label: 'Total Users', value: systemStats?.total_users || 0, icon: Users, color: 'blue', change: '+12%' },
-            { label: 'Active Users', value: systemStats?.active_users || 0, icon: Activity, color: 'emerald', change: '+5%' },
-            { label: 'SMS Sent', value: systemStats?.total_sms_sent || 0, icon: MessageSquare, color: 'violet', change: '+24%' },
-            { label: 'Transactions', value: systemStats?.total_transactions || 0, icon: CreditCard, color: 'amber', change: '+8%' },
+            { label: 'Total Users', value: systemStats?.totalUsers || 0, icon: Users, color: 'blue', change: '+12%' },
+            { label: 'Active Users', value: systemStats?.activeUsers || 0, icon: Activity, color: 'emerald', change: '+5%' },
+            { label: 'SMS Sent', value: systemStats?.totalSmsSent || 0, icon: MessageSquare, color: 'violet', change: '+24%' },
+            { label: 'Transactions', value: systemStats?.totalTransactions || 0, icon: CreditCard, color: 'amber', change: '+8%' },
           ].map((stat, i) => (
             <div key={i} className="bg-white dark:bg-gray-800 rounded-xl p-5 border border-gray-100 dark:border-gray-700">
               <div className="flex justify-between items-start">
@@ -536,33 +466,33 @@ function UserServices() {
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900 dark:to-indigo-900 flex items-center justify-center text-blue-700 dark:text-blue-300 font-bold text-sm">
-                              {getInitials(user.full_name)}
+                              {getInitials(user.fullName || '')}
                             </div>
                             <div className="flex flex-col">
-                              <span className="text-sm font-semibold text-gray-900 dark:text-white">{user.full_name}</span>
+                              <span className="text-sm font-semibold text-gray-900 dark:text-white">{user.fullName}</span>
                               <span className="text-xs text-gray-500 dark:text-gray-400">{user.email}</span>
                             </div>
                           </div>
                         </td>
                         <td className="px-6 py-4">
                           <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-800">
-                            {user.plan_sub || user.plan || 'Basic'}
+                            {user.planSub || 'Basic'}
                           </span>
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-1.5 text-sm font-medium text-gray-900 dark:text-white">
                             <span className="text-gray-400 dark:text-gray-500 text-xs">UGX</span>
-                            {user.wallet_balance?.toLocaleString() || parseFloat(user.wallet || '0').toLocaleString()}
+                            {parseFloat(user.wallet || '0').toLocaleString()}
                           </div>
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300 font-medium">
-                          {user.total_sms_sent || user.sms_sent || 0}
+                          {user.totalSmsSent || 0}
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-2">
-                            <span className={`w-2 h-2 rounded-full ${user.is_active ? 'bg-emerald-500' : 'bg-red-500'}`}></span>
-                            <span className={`text-sm font-medium ${user.is_active ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400'}`}>
-                              {user.is_active ? 'Active' : 'Inactive'}
+                            <span className={`w-2 h-2 rounded-full ${user.isActive ? 'bg-emerald-500' : 'bg-red-500'}`}></span>
+                            <span className={`text-sm font-medium ${user.isActive ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400'}`}>
+                              {user.isActive ? 'Active' : 'Inactive'}
                             </span>
                           </div>
                         </td>
@@ -583,16 +513,16 @@ function UserServices() {
                             <Button
                               onClick={() => toggleUserStatusMutation.mutate({
                                 userId: user.id,
-                                activate: !user.is_active
+                                activate: !user.isActive
                               })}
                               variant="outline"
                               size="sm"
-                              className={`h-8 w-8 p-0 rounded-full ${user.is_active
+                              className={`h-8 w-8 p-0 rounded-full ${user.isActive
                                 ? 'hover:bg-red-50 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400'
                                 : 'hover:bg-emerald-50 dark:hover:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400'
                                 }`}
                               disabled={toggleUserStatusMutation.isPending}
-                              title={user.is_active ? 'Deactivate User' : 'Activate User'}
+                              title={user.isActive ? 'Deactivate User' : 'Activate User'}
                             >
                               {toggleUserStatusMutation.isPending ? (
                                 <RefreshCw className="w-4 h-4 animate-spin" />
@@ -715,9 +645,9 @@ function UserServices() {
               </div>
             ) : statsError ? (
               <div className="text-center py-8 text-red-500">Failed to load plan distribution</div>
-            ) : systemStats?.users_by_plan ? (
+            ) : systemStats?.usersByPlan ? (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {Object.entries(systemStats.users_by_plan).map(([plan, count]) => (
+                {Object.entries(systemStats.usersByPlan).map(([plan, count]) => (
                   <div key={plan} className="flex flex-col items-center justify-center p-6 rounded-xl border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/30">
                     <span className="text-3xl font-bold text-gray-900 dark:text-white mb-2">{(count as number).toLocaleString()}</span>
                     <span className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">{plan}</span>
@@ -739,7 +669,7 @@ function UserServices() {
               Add Balance
             </h3>
             <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
-              Adding funds to <span className="font-medium text-gray-900 dark:text-white">{selectedUser.full_name}</span>'s wallet.
+              Adding funds to <span className="font-medium text-gray-900 dark:text-white">{selectedUser.fullName}</span>'s wallet.
             </p>
 
             <div className="space-y-4">

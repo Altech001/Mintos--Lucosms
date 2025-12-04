@@ -3,10 +3,9 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { ChevronLeftIcon, EyeCloseIcon, EyeIcon } from "../../icons";
 import Label from "../form/Label";
-import Input from "../form/input/InputField";
 import Checkbox from "../form/input/Checkbox";
+import Input from "../form/input/InputField";
 import Button from "../ui/button/Button";
-import Badge from "../ui/badge/Badge";
 
 export default function SignUpForm() {
   const [showPassword, setShowPassword] = useState(false);
@@ -32,11 +31,11 @@ export default function SignUpForm() {
       navigate("/");
     } catch (err: unknown) {
       let message = "An unexpected error occurred.";
-      
+
       if (err instanceof Error) {
         // Check for common error patterns
         const errorMsg = err.message.toLowerCase();
-        
+
         if (errorMsg.includes("409") || errorMsg.includes("already exists") || errorMsg.includes("duplicate")) {
           message = "An account with this email already exists. Please sign in instead.";
         } else if (errorMsg.includes("400") || errorMsg.includes("invalid")) {
@@ -55,7 +54,7 @@ export default function SignUpForm() {
           message = err.message;
         }
       }
-      
+
       setError(message);
     } finally {
       setIsLoading(false);
@@ -84,7 +83,7 @@ export default function SignUpForm() {
             </p>
           </div>
           <div>
-            <Badge>Coming Soon</Badge>
+            {/* <Badge>Coming Soon</Badge>
             
             <div className="py-1">
               <div className="grid gap-3  sm:gap-5">
@@ -127,7 +126,7 @@ export default function SignUpForm() {
                   Or
                 </span>
               </div>
-            </div>
+            </div> */}
             <form onSubmit={handleSubmit}>
               <div className="space-y-5">
                 <div>

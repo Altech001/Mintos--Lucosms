@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { PromoCodePublic, PromoCodeCreate, PromoCodeUpdate } from '../../lib/api/models';
+import { PromoCodePublic, PromoCodeCreate, PromoCodeUpdate } from '@/lib/api/models';
 import Input from '../../components/form/input/InputField';
 import Label from '../../components/form/Label';
 import Button from '../../components/ui/button/Button';
@@ -39,7 +39,7 @@ export default function PromoCodeForm({ promoCode, onSave, onCancel }: PromoCode
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const data = { 
+    const data = {
       code,
       smsCost: String(smsCost),
       expiresAt: expiresAt ? new Date(expiresAt) : null,
@@ -96,8 +96,8 @@ export default function PromoCodeForm({ promoCode, onSave, onCancel }: PromoCode
         />
       </div>
       <div className="flex items-center gap-4">
-          <Checkbox checked={isActive} onChange={setIsActive} />
-          <Label>Is Active</Label>
+        <Checkbox checked={isActive} onChange={setIsActive} />
+        <Label>Is Active</Label>
       </div>
       <div className="flex justify-end gap-4 pt-4">
         <Button type="button" onClick={onCancel} variant="outline">Cancel</Button>
