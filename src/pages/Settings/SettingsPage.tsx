@@ -5,6 +5,8 @@ import Button from "../../components/ui/button/Button";
 import { PlanInfo } from "@/lib/api/models";
 import Skeleton from "../../components/ui/Skeleton";
 import Input from "../../components/form/input/InputField";
+import QRCode from "react-qr-code";
+
 import { CheckCircle, User, Phone, FileText, Send } from "lucide-react";
 
 export default function SettingsPage() {
@@ -32,11 +34,13 @@ export default function SettingsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLowBalanceModalOpen, setIsLowBalanceModalOpen] = useState(false);
   const [lowBalanceThreshold, setLowBalanceThreshold] = useState<string>(() => {
-    const saved = localStorage.getItem('lowBalanceThreshold');
-    return saved || '1000';
+    const saved = localStorage.getItem("lowBalanceThreshold");
+    return saved || "1000";
   });
   const [lowBalanceError, setLowBalanceError] = useState<string | null>(null);
-  const [lowBalanceSuccess, setLowBalanceSuccess] = useState<string | null>(null);
+  const [lowBalanceSuccess, setLowBalanceSuccess] = useState<string | null>(
+    null
+  );
 
   const fetchPlans = useCallback(async () => {
     setIsLoadingPlans(true);
@@ -93,9 +97,11 @@ export default function SettingsPage() {
       // This will be implemented when admin privileges are added
 
       // Simulate submission
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise((resolve) => setTimeout(resolve, 1000));
 
-      setMessage(`Plan change request submitted successfully! Your request to change to the ${selectedPlan} plan is pending admin approval.`);
+      setMessage(
+        `Plan change request submitted successfully! Your request to change to the ${selectedPlan} plan is pending admin approval.`
+      );
       setIsPreviewModalOpen(false);
       setFullName("");
       setPhoneNumber("");
@@ -119,12 +125,14 @@ export default function SettingsPage() {
       return;
     }
 
-    localStorage.setItem('lowBalanceThreshold', lowBalanceThreshold);
-    setLowBalanceSuccess(`Low balance alert set to ${threshold.toFixed(0)} UGX`);
+    localStorage.setItem("lowBalanceThreshold", lowBalanceThreshold);
+    setLowBalanceSuccess(
+      `Low balance alert set to ${threshold.toFixed(0)} UGX`
+    );
     setIsLowBalanceModalOpen(false);
 
     // Trigger a re-render of the header component by dispatching a custom event
-    window.dispatchEvent(new Event('lowBalanceThresholdChanged'));
+    window.dispatchEvent(new Event("lowBalanceThresholdChanged"));
   };
 
   const handleDeleteAccount = async () => {
@@ -156,18 +164,29 @@ export default function SettingsPage() {
     setIsApplyingPromo(true);
     try {
       const response = await apiClient.api.promoCodes.promoCodesApplyPromoCode({
-        applyPromoCodeRequest: { code: promoCode.trim() }
+        applyPromoCodeRequest: { code: promoCode.trim() },
       });
-      setPromoSuccess(response.message || `Promo code applied! New SMS cost: ${response.newSmsCost} UGX (saved ${response.savingsPerSms} UGX per SMS)`);
+      setPromoSuccess(
+        response.message ||
+          `Promo code applied! New SMS cost: ${response.newSmsCost} UGX (saved ${response.savingsPerSms} UGX per SMS)`
+      );
       setPromoCode("");
       setIsPromoModalOpen(false); // Close modal on success
       await checkAuth(); // Refresh user data to reflect new SMS cost
     } catch (err) {
       // Handle specific error messages from the API
-      if (typeof err === 'object' && err !== null) {
-        const errorObj = err as { response?: { status?: number; json?: () => Promise<{ detail?: string }> }; message?: string };
+      if (typeof err === "object" && err !== null) {
+        const errorObj = err as {
+          response?: {
+            status?: number;
+            json?: () => Promise<{ detail?: string }>;
+          };
+          message?: string;
+        };
         if (errorObj.response?.status === 400 && errorObj.response.json) {
-          const errorData = await errorObj.response.json().catch(() => ({ detail: undefined }));
+          const errorData = await errorObj.response
+            .json()
+            .catch(() => ({ detail: undefined }));
           setPromoError(errorData.detail || "Invalid or expired promo code.");
         } else {
           setPromoError(errorObj.message || "Failed to apply promo code.");
@@ -182,78 +201,138 @@ export default function SettingsPage() {
 
   return (
     <div className="p-4 sm:p-6">
-      <h1 className="text-2xl font-semibold text-gray-800 dark:text-white mb-6">Change Plan</h1>
+      <h1 className="text-2xl font-semibold text-gray-800 dark:text-white mb-6">
+        Change Plan
+      </h1>
 
-      {message && <div className="p-4 mb-4 text-sm text-green-700 bg-green-100 rounded-lg dark:bg-green-200 dark:text-green-800">{message}</div>}
-      {error && <div className="p-4 mb-4 text-sm text-red-700 bg-red-100 rounded-lg dark:bg-red-200 dark:text-red-800">{error}</div>}
+      {message && (
+        <div className="p-4 mb-4 text-sm text-green-700 bg-green-100 rounded-lg dark:bg-green-200 dark:text-green-800">
+          {message}
+        </div>
+      )}
+      {error && (
+        <div className="p-4 mb-4 text-sm text-red-700 bg-red-100 rounded-lg dark:bg-red-200 dark:text-red-800">
+          {error}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-        {isLoadingPlans ? (
-          Array.from({ length: 4 }).map((_, index) => (
-            <div key={index} className="p-6 bg-white rounded-lg shadow-md dark:bg-gray-800">
-              <Skeleton className="w-1/2 h-7" />
-              <Skeleton className="w-1/3 h-10 mt-2" />
-              <Skeleton className="w-full h-4 mt-4" />
-              <div className="mt-6 space-y-2">
-                <Skeleton className="w-3/4 h-4" />
-                <Skeleton className="w-2/3 h-4" />
-                <Skeleton className="w-1/2 h-4" />
+        {isLoadingPlans
+          ? Array.from({ length: 4 }).map((_, index) => (
+              <div
+                key={index}
+                className="p-6 bg-white rounded-lg shadow-md dark:bg-gray-800"
+              >
+                <Skeleton className="w-1/2 h-7" />
+                <Skeleton className="w-1/3 h-10 mt-2" />
+                <Skeleton className="w-full h-4 mt-4" />
+                <div className="mt-6 space-y-2">
+                  <Skeleton className="w-3/4 h-4" />
+                  <Skeleton className="w-2/3 h-4" />
+                  <Skeleton className="w-1/2 h-4" />
+                </div>
               </div>
-            </div>
-          ))
-        ) : (
-          Object.values(plans).map((plan) => (
-            <div
-              key={plan.planName}
-              className={`p-6 border rounded-lg shadow-md cursor-pointer ${user?.planSub === plan.planName ? 'border-brand-500 bg-brand-50 dark:bg-brand-900/20' : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'}`}
-              onClick={() => setSelectedPlan(plan.planName)}
-            >
-              <h2 className="text-xl font-semibold text-gray-800 dark:text-white">{plan.planName}</h2>
-              <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">{plan.smsCost} <span className="text-sm font-normal">UGX/SMS</span></p>
-              <p className="mt-4 text-sm text-gray-600 dark:text-gray-400">{plan.description}</p>
-              <ul className="mt-6 space-y-2 text-sm text-gray-600 dark:text-gray-400">
-                {plan.features.map((feature) => (
-                  <li key={feature} className="flex items-center gap-2">
-                    <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
-                    <span>{feature}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )))}
+            ))
+          : Object.values(plans).map((plan) => (
+              <div
+                key={plan.planName}
+                className={`p-6 border rounded-lg cursor-pointer ${
+                  user?.planSub === plan.planName
+                    ? "border-brand-500 bg-white dark:bg-brand-500/20"
+                    : "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700"
+                }`}
+                onClick={() => setSelectedPlan(plan.planName)}
+              >
+                <h2 className="text-xl font-semibold text-gray-800 dark:text-white">
+                  {plan.planName}
+                </h2>
+                <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
+                  {plan.smsCost}{" "}
+                  <span className="text-sm font-normal">UGX/SMS</span>
+                </p>
+                <p className="mt-4 text-sm text-gray-600 dark:text-gray-400">
+                  {plan.description}
+                </p>
+                <ul className="mt-6 space-y-2 text-sm text-gray-600 dark:text-gray-400">
+                  {plan.features.map((feature) => (
+                    <li key={feature} className="flex items-center gap-2">
+                      <svg
+                        className="w-4 h-4 text-green-500"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="2"
+                          d="M5 13l4 4L19 7"
+                        ></path>
+                      </svg>
+                      <span>{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
       </div>
 
       {selectedPlan && (
         <div className="mt-8 text-center">
-          <p className="mb-4 text-lg text-gray-800 dark:text-white">You have selected the <strong>{selectedPlan}</strong> plan.</p>
-          <Button onClick={openChangePlanModal} size="md">Request Plan Change</Button>
+          <p className="mb-4 text-lg text-gray-800 dark:text-white">
+            You have selected the <strong>{selectedPlan}</strong> plan.
+          </p>
+          <Button onClick={openChangePlanModal} size="md">
+            Request Plan Change
+          </Button>
         </div>
       )}
 
       {/* Promo Code Section */}
       <div className="mt-12 border-t border-gray-200 dark:border-white/10 pt-8">
-        <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-3">Promo Code</h2>
-        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">Have a promo code? Apply it to get special SMS pricing and save on your messages.</p>
+        <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-3">
+          Promo Code
+        </h2>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+          Have a promo code? Apply it to get special SMS pricing and save on
+          your messages.
+        </p>
         {promoSuccess && (
           <div className="p-4 mb-4 text-sm text-green-700 bg-green-100 rounded-lg dark:bg-green-200 dark:text-green-800">
             {promoSuccess}
           </div>
         )}
-        <Button variant="outline" onClick={() => { setIsPromoModalOpen(true); setPromoCode(""); setPromoError(null); setPromoSuccess(null); }}>
+        <Button
+          variant="outline"
+          onClick={() => {
+            setIsPromoModalOpen(true);
+            setPromoCode("");
+            setPromoError(null);
+            setPromoSuccess(null);
+          }}
+        >
           Apply Promo Code
         </Button>
       </div>
 
       {/* Low Balance Alert Section */}
       <div className="mt-12 border-t border-gray-200 dark:border-white/10 pt-8">
-        <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-3">Low Balance Alert</h2>
+        <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-3">
+          Low Balance Alert
+        </h2>
         <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-          Set a threshold amount to receive alerts when your wallet balance is low. You'll see a warning in the header when your balance drops below this amount.
+          Set a threshold amount to receive alerts when your wallet balance is
+          low. You'll see a warning in the header when your balance drops below
+          this amount.
         </p>
         <div className="flex items-center gap-4 mb-4">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Current threshold:</span>
-            <span className="text-sm font-semibold text-brand-600 dark:text-brand-400">{parseFloat(lowBalanceThreshold).toFixed(0)} UGX</span>
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              Current threshold:
+            </span>
+            <span className="text-sm font-semibold text-brand-600 dark:text-brand-400">
+              {parseFloat(lowBalanceThreshold).toFixed(0)} UGX
+            </span>
           </div>
         </div>
         {lowBalanceSuccess && (
@@ -261,16 +340,69 @@ export default function SettingsPage() {
             {lowBalanceSuccess}
           </div>
         )}
-        <Button variant="outline" onClick={() => { setIsLowBalanceModalOpen(true); setLowBalanceError(null); setLowBalanceSuccess(null); }}>
+        <Button
+          variant="outline"
+          onClick={() => {
+            setIsLowBalanceModalOpen(true);
+            setLowBalanceError(null);
+            setLowBalanceSuccess(null);
+          }}
+        >
           Configure Alert Threshold
         </Button>
       </div>
 
+      {/* 2 Factor Authentication Zone */}
+      <div className="mt-12 flex flex-row justify-between border-t border-gray-200 dark:border-white/10 pt-8">
+        <div>
+          <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-3">
+            2 Factor Authentication
+          </h2>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            Add an authentication layer to your account.
+          </p>
+          <Button
+            variant="primary"
+            onClick={() => {
+              
+            }}
+          >
+            Add 2FA Method
+          </Button>
+        </div>
+
+        <div className=" flex flex-col items-center justify-center">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Scan Qr Code
+          </p>
+          <div className="w-32 h-32 bg-gray-200 dark:bg-gray-700 rounded-lg flex items-center justify-center">
+            <QRCode
+              value="otpauth://totp/YourApp:username?secret=  JBSWY3DPEHPK3PXP&issuer=YourApp"
+              size={80}
+              style={{borderRadius:2}}
+              viewBox={`0 0 256 256`}
+            />
+          </div>
+        </div>
+      </div>
+
       {/* Danger Zone */}
       <div className="mt-12 border-t border-gray-200 dark:border-white/10 pt-8">
-        <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-3">Danger Zone</h2>
-        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">Delete your account and all related data. This action cannot be undone.</p>
-        <Button variant="danger" onClick={() => { setIsDeleteModalOpen(true); setDeleteConfirmText(""); setDeleteError(null); }}>
+        <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-3">
+          Danger Zone
+        </h2>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+          Delete your account and all related data. This action cannot be
+          undone.
+        </p>
+        <Button
+          variant="danger"
+          onClick={() => {
+            setIsDeleteModalOpen(true);
+            setDeleteConfirmText("");
+            setDeleteError(null);
+          }}
+        >
           Delete Account
         </Button>
       </div>
@@ -279,21 +411,32 @@ export default function SettingsPage() {
       {isChangePlanModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl max-w-lg w-full p-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Request Plan Change</h3>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+              Request Plan Change
+            </h3>
             <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
-              Fill in the details below to submit your plan change request for admin approval.
+              Fill in the details below to submit your plan change request for
+              admin approval.
             </p>
 
             {/* Plan Info Card */}
             <div className="mb-4 p-4 bg-brand-50 dark:bg-brand-900/20 rounded-lg border border-brand-200 dark:border-brand-800">
               <div className="flex justify-between items-center">
                 <div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Selected Plan</p>
-                  <p className="text-lg font-semibold text-gray-900 dark:text-white">{selectedPlan}</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Selected Plan
+                  </p>
+                  <p className="text-lg font-semibold text-gray-900 dark:text-white">
+                    {selectedPlan}
+                  </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm text-gray-600 dark:text-gray-400">SMS Cost</p>
-                  <p className="text-lg font-semibold text-brand-600 dark:text-brand-400">{plans[selectedPlan || '']?.smsCost} UGX</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    SMS Cost
+                  </p>
+                  <p className="text-lg font-semibold text-brand-600 dark:text-brand-400">
+                    {plans[selectedPlan || ""]?.smsCost} UGX
+                  </p>
                 </div>
               </div>
             </div>
@@ -320,9 +463,13 @@ export default function SettingsPage() {
                   type="tel"
                   placeholder="e.g. 256712345678"
                   value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value.replace(/[^\d+]/g, ''))}
+                  onChange={(e) =>
+                    setPhoneNumber(e.target.value.replace(/[^\d+]/g, ""))
+                  }
                 />
-                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Format: countrycode + number (e.g., 2567xxxxxxx)</p>
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Format: countrycode + number (e.g., 2567xxxxxxx)
+                </p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -338,14 +485,23 @@ export default function SettingsPage() {
                 />
               </div>
               {changePlanError && (
-                <p className="text-sm text-red-600 dark:text-red-400">{changePlanError}</p>
+                <p className="text-sm text-red-600 dark:text-red-400">
+                  {changePlanError}
+                </p>
               )}
             </div>
             <div className="flex justify-end gap-3 mt-6">
-              <Button variant="outline" onClick={() => setIsChangePlanModalOpen(false)}>Cancel</Button>
+              <Button
+                variant="outline"
+                onClick={() => setIsChangePlanModalOpen(false)}
+              >
+                Cancel
+              </Button>
               <Button
                 onClick={handleProceedToPreview}
-                disabled={!fullName.trim() || !phoneNumber.trim() || !description.trim()}
+                disabled={
+                  !fullName.trim() || !phoneNumber.trim() || !description.trim()
+                }
               >
                 Preview Request
               </Button>
@@ -358,9 +514,12 @@ export default function SettingsPage() {
       {isLowBalanceModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl max-w-lg w-full p-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Set Low Balance Alert Threshold</h3>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+              Set Low Balance Alert Threshold
+            </h3>
             <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
-              Enter the minimum wallet balance amount. You'll be alerted when your balance falls below this threshold.
+              Enter the minimum wallet balance amount. You'll be alerted when
+              your balance falls below this threshold.
             </p>
             <div className="space-y-4">
               <div>
@@ -378,12 +537,21 @@ export default function SettingsPage() {
                 </p>
               </div>
               {lowBalanceError && (
-                <p className="text-sm text-red-600 dark:text-red-400">{lowBalanceError}</p>
+                <p className="text-sm text-red-600 dark:text-red-400">
+                  {lowBalanceError}
+                </p>
               )}
             </div>
             <div className="flex justify-end gap-3 mt-6">
-              <Button variant="outline" onClick={() => setIsLowBalanceModalOpen(false)}>Cancel</Button>
-              <Button onClick={handleSaveLowBalanceThreshold}>Save Threshold</Button>
+              <Button
+                variant="outline"
+                onClick={() => setIsLowBalanceModalOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button onClick={handleSaveLowBalanceThreshold}>
+                Save Threshold
+              </Button>
             </div>
           </div>
         </div>
@@ -393,9 +561,12 @@ export default function SettingsPage() {
       {isPromoModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl max-w-lg w-full p-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Apply Promo Code</h3>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+              Apply Promo Code
+            </h3>
             <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
-              Enter your promo code below to get special SMS pricing. The new rate will be applied to your account immediately.
+              Enter your promo code below to get special SMS pricing. The new
+              rate will be applied to your account immediately.
             </p>
             <div className="mt-4">
               <Input
@@ -404,11 +575,18 @@ export default function SettingsPage() {
                 onChange={(e) => setPromoCode(e.target.value)}
               />
               {promoError && (
-                <p className="mt-2 text-sm text-red-600 dark:text-red-400">{promoError}</p>
+                <p className="mt-2 text-sm text-red-600 dark:text-red-400">
+                  {promoError}
+                </p>
               )}
             </div>
             <div className="flex justify-end gap-3 mt-6">
-              <Button variant="outline" onClick={() => setIsPromoModalOpen(false)}>Cancel</Button>
+              <Button
+                variant="outline"
+                onClick={() => setIsPromoModalOpen(false)}
+              >
+                Cancel
+              </Button>
               <Button
                 onClick={handleApplyPromoCode}
                 isLoading={isApplyingPromo}
@@ -429,19 +607,28 @@ export default function SettingsPage() {
               Review Your Request
             </h3>
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-              Please review the details below before submitting for admin approval.
+              Please review the details below before submitting for admin
+              approval.
             </p>
 
             <div className="space-y-4">
               {/* Plan Details */}
               <div className="p-4 bg-gradient-to-br from-brand-50 to-brand-100 dark:from-brand-900/20 dark:to-brand-800/20 rounded-lg border border-brand-200 dark:border-brand-800">
                 <div className="flex justify-between items-center mb-2">
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Plan</span>
-                  <span className="text-lg font-bold text-brand-600 dark:text-brand-400">{selectedPlan}</span>
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Plan
+                  </span>
+                  <span className="text-lg font-bold text-brand-600 dark:text-brand-400">
+                    {selectedPlan}
+                  </span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">SMS Cost</span>
-                  <span className="text-lg font-bold text-brand-600 dark:text-brand-400">{plans[selectedPlan || '']?.smsCost} UGX</span>
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    SMS Cost
+                  </span>
+                  <span className="text-lg font-bold text-brand-600 dark:text-brand-400">
+                    {plans[selectedPlan || ""]?.smsCost} UGX
+                  </span>
                 </div>
               </div>
 
@@ -450,22 +637,34 @@ export default function SettingsPage() {
                 <div className="flex items-start gap-3">
                   <User className="h-5 w-5 text-gray-500 dark:text-gray-400 mt-0.5" />
                   <div className="flex-1">
-                    <p className="text-xs text-gray-500 dark:text-gray-400">Full Name</p>
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">{fullName}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      Full Name
+                    </p>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">
+                      {fullName}
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
                   <Phone className="h-5 w-5 text-gray-500 dark:text-gray-400 mt-0.5" />
                   <div className="flex-1">
-                    <p className="text-xs text-gray-500 dark:text-gray-400">Phone Number</p>
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">{phoneNumber}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      Phone Number
+                    </p>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">
+                      {phoneNumber}
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
                   <FileText className="h-5 w-5 text-gray-500 dark:text-gray-400 mt-0.5" />
                   <div className="flex-1">
-                    <p className="text-xs text-gray-500 dark:text-gray-400">Description</p>
-                    <p className="text-sm text-gray-700 dark:text-gray-300">{description}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      Description
+                    </p>
+                    <p className="text-sm text-gray-700 dark:text-gray-300">
+                      {description}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -474,7 +673,8 @@ export default function SettingsPage() {
               <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
                 <p className="text-xs text-blue-700 dark:text-blue-300">
                   <CheckCircle className="inline h-4 w-4 mr-1" />
-                  Your request will be reviewed by an administrator. You'll be notified once it's approved.
+                  Your request will be reviewed by an administrator. You'll be
+                  notified once it's approved.
                 </p>
               </div>
             </div>
@@ -497,7 +697,9 @@ export default function SettingsPage() {
                 disabled={isSubmitting}
                 className="flex-1"
               >
-                {isSubmitting ? 'Submitting...' : (
+                {isSubmitting ? (
+                  "Submitting..."
+                ) : (
                   <>
                     <Send className="mr-2 h-4 w-4" />
                     Send for Approval
@@ -513,9 +715,14 @@ export default function SettingsPage() {
       {isDeleteModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl max-w-lg w-full p-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Confirm Account Deletion</h3>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+              Confirm Account Deletion
+            </h3>
             <p className="text-sm text-gray-600 dark:text-gray-300">
-              This will permanently delete your account and all associated data. To confirm, please type <span className="font-mono font-semibold">DELETE</span> in the input below.
+              This will permanently delete your account and all associated data.
+              To confirm, please type{" "}
+              <span className="font-mono font-semibold">DELETE</span> in the
+              input below.
             </p>
             <div className="mt-4">
               <Input
@@ -524,11 +731,18 @@ export default function SettingsPage() {
                 onChange={(e) => setDeleteConfirmText(e.target.value)}
               />
               {deleteError && (
-                <p className="mt-2 text-sm text-red-600 dark:text-red-400">{deleteError}</p>
+                <p className="mt-2 text-sm text-red-600 dark:text-red-400">
+                  {deleteError}
+                </p>
               )}
             </div>
             <div className="flex justify-end gap-3 mt-6">
-              <Button variant="outline" onClick={() => setIsDeleteModalOpen(false)}>Cancel</Button>
+              <Button
+                variant="outline"
+                onClick={() => setIsDeleteModalOpen(false)}
+              >
+                Cancel
+              </Button>
               <Button
                 variant="danger"
                 onClick={handleDeleteAccount}
