@@ -144,7 +144,7 @@ export default function AutoTopUp() {
 
       // Ensure amount is an integer
       const amountInt = Math.round(amount);
-      const serviceFee = Math.round(amountInt * 0.9);
+      const serviceFee = Math.round(amountInt * 0.10);
       const totalCharge = amountInt + serviceFee;
 
       const payload = {

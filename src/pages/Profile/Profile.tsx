@@ -494,7 +494,9 @@ export default function ProfilePage() {
 }
 title = "Change Password"
   >
+
   <div className="space-y-5">
+    
     <div>
       <Label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">
         Current Password
@@ -507,10 +509,14 @@ title = "Change Password"
         className="w-full"
       />
     </div>
+    <span className="text-xs font-medium text-gray-700 dark:text-gray-500 mb-1.5 block">
+        8 charaters minimum, including uppercase, lowercase, number, and special character.
+      </span>
     <div>
       <Label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">
         New Password
       </Label>
+      
       <Input
         type="password"
         value={newPassword}
