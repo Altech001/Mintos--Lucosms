@@ -112,14 +112,10 @@ export default function EcommerceMetrics() {
           <BoltIcon className="text-gray-800 size-6 dark:text-white/90" />
         </div>
         <div className="flex items-end justify-between mt-5">
-          <div>
-            <h4 className="mt-2 font-bold text-gray-800 text-title-xs dark:text-white/90">
-              {currentPlan}
-            </h4>
-          </div>
 
           <div className="flex flex-col gap-1">
-            <span className="text-xs text-gray-500 dark:text-gray-400">Available Plans:</span>
+            <span className="text-sm font-black text-gray-500 dark:text-gray-400">Available Plans:</span>
+            <span className="text-xs text-gray-500 dark:text-gray-400">You are active on {currentPlan} Plan</span>
             <div className="flex flex-wrap gap-1">
               {availablePlans.map((plan) => (
                 <Badge

@@ -4,6 +4,7 @@ import EcommerceMetrics from "../../components/ecommerce/EcommerceMetrics";
 import RecentOrders from "../../components/ecommerce/RecentOrders";
 import SalesCategoryChart from "../../components/ecommerce/SalesCategorgy";
 import StatisticsChart from "../../components/ecommerce/StatisticsChart";
+import MiniGraph from "../../components/ecommerce/MiniGraph";
 
 export default function Home() {
   return (
@@ -17,13 +18,15 @@ export default function Home() {
           <EcommerceMetrics />
 
           <StatisticsChart />
-          <div className="col-span-10 xl:col-span-2 ">
-          <RecentOrders />
-        </div>
+          <div className="col-span-8 xl:col-span-2 ">
+            <RecentOrders />
+          </div>
         </div>
 
-        <div className="col-span-10 space-y-6 xl:col-span-5 ">
+        <div className="col-span-12 space-y-6 xl:col-span-5 ">
+          <MiniGraph />
           <DemographicCard />
+
 
           <SalesCategoryChart />
         </div>

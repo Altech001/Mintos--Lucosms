@@ -52,25 +52,6 @@ export default function UserDropdown() {
             className="w-full h-full object-cover"
           />
         </span>
-
-        <span className="block mr-1 font-medium text-theme-sm">{user?.fullName || user?.email}</span>
-        <svg
-          className={`stroke-gray-500 dark:stroke-gray-400 transition-transform duration-200 ${isOpen ? "rotate-180" : ""
-            }`}
-          width="18"
-          height="20"
-          viewBox="0 0 18 20"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M4.3125 8.65625L9 13.3437L13.6875 8.65625"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
       </button>
 
       <Dropdown
@@ -154,17 +135,17 @@ export default function UserDropdown() {
               onItemClick={closeDropdown}
               tag="a"
               to="https://chat.whatsapp.com/BC5YiZHV7zAJwY1cbCC6ii"
-              
+
               className="flex items-center gap-3 px-3 py-2 font-medium text-gray-700 rounded-lg group text-theme-sm hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300"
             ><Link to="https://chat.whatsapp.com/BC5YiZHV7zAJwY1cbCC6ii" target="_blank" className="hidden lg:block">
-        <img
-          className="hidden lg:block"
-          src="./images/chat/wap1.svg"
-          alt="Logo"
-          width={34}
-          height={34}
-        />
-        </Link>              
+                <img
+                  className="hidden lg:block"
+                  src="./images/chat/wap1.svg"
+                  alt="Logo"
+                  width={34}
+                  height={34}
+                />
+              </Link>
               Join WhatsApp Group
             </DropdownItem>
           </li>

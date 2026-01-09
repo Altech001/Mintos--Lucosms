@@ -1,29 +1,27 @@
 import {
   BanknoteArrowUpIcon,
-  EqualApproximatelyIcon,
-  KeyRoundIcon,
+  HistoryIcon,
   LayoutTemplate,
   MailIcon,
   MessageCircleHeartIcon,
-  MessageCircleMore,
-  ServerIcon,
-  SquareActivity,
-  SquareStack,
+  SettingsIcon,
+  Share2Icon,
   StoreIcon,
-  TicketPercentIcon,
   UsersIcon
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useSidebar } from "../context/SidebarContext";
-import { ChevronDownIcon, PlugInIcon } from "../icons";
-import SidebarWidget from "./SidebarWidget";
+import { ChevronDownIcon } from "../icons";
+
 
 type NavItem = {
   name: string;
   icon: React.ReactNode;
   path?: string;
+  pro?: boolean;
+  new?: boolean;
   subItems?: { name: string; path: string; pro?: boolean; new?: boolean }[];
 };
 
@@ -45,21 +43,16 @@ const navItems: NavItem[] = [
     name: "Templates",
     subItems: [
       { name: "List Templates", path: "/templates", pro: false },
-      { name: "Creating Templates", path: "/tpage", pro: false },
+      { name: "Creating Template", path: "/tpage", pro: false },
     ],
   },
   {
     name: "Recent History",
-    icon: <SquareStack />,
+    icon: <HistoryIcon />,
     path: "/history",
   },
   {
-    name: "Billings",
-    icon: <SquareActivity />,
-    path: "/billings",
-  },
-  {
-    name: "Auto TopUp",
+    name: "TopUp Account",
     icon: <BanknoteArrowUpIcon />,
     path: "/autotopup",
   },
@@ -67,20 +60,17 @@ const navItems: NavItem[] = [
 
 const othersItems: NavItem[] = [
   {
-    icon: <PlugInIcon />,
+    icon: <SettingsIcon />,
     name: "Extensions",
 
     subItems: [
       { name: "Settings", path: "/settings", pro: false },
+      { name: "Transcations", path: "/billings", pro: true },
       { name: "Contacts Folder", path: "/contacts", pro: false, new: true },
       { name: "Tickets", path: "/tickets", pro: false, new: true },
       { name: "Developer", path: "/developers", pro: false },
+      { name: "Documentation", path: "/api_doc", pro: false },
     ],
-  },
-  {
-    name: "Documentation",
-    icon: <EqualApproximatelyIcon />,
-    path: "/api_doc",
   },
 ];
 
@@ -99,19 +89,15 @@ const adminItems: NavItem[] = [
     path: "/admin/users",
   },
   {
-    name: "Promo Codes",
-    icon: <TicketPercentIcon />,
-    path: "/admin/promo-codes",
-  },
-  {
-    name: "Services",
-    icon: <ServerIcon />,
-    path: "/admin/services",
-  },
+    name: "Share Credits",
+    icon: <Share2Icon />,
+    path: "/share-credits",
+    new: true
+  }
 ];
 
 const AppSidebar: React.FC = () => {
-  const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
+  const { isExpanded, isMobileOpen, toggleSidebar } = useSidebar();
   const { user } = useAuth();
   const location = useLocation();
 
@@ -144,8 +130,8 @@ const AppSidebar: React.FC = () => {
       items: NavItem[];
     }[] = [
         { type: "main", items: navItems },
-        { type: "others", items: othersItems },
         { type: "developer", items: developerItems },
+        { type: "others", items: othersItems },
       ];
     if (user?.isSuperuser) {
       allMenus.push({ type: "admin", items: adminItems });
@@ -185,6 +171,9 @@ const AppSidebar: React.FC = () => {
     index: number,
     menuType: "main" | "others" | "admin" | "developer"
   ) => {
+    if (!isExpanded && !isMobileOpen) {
+      toggleSidebar();
+    }
     setOpenSubmenu((prevOpenSubmenu) => {
       if (
         prevOpenSubmenu &&
@@ -203,14 +192,14 @@ const AppSidebar: React.FC = () => {
   ) => (
     <ul className="flex flex-col gap-4">
       {items.map((nav, index) => (
-        <li key={nav.name}>
+        <li key={nav.name} className="relative group/tooltip">
           {nav.subItems ? (
             <button
               onClick={() => handleSubmenuToggle(index, menuType)}
               className={`menu-item group ${openSubmenu?.type === menuType && openSubmenu?.index === index
                 ? "menu-item-active"
                 : "menu-item-inactive"
-                } cursor-pointer ${!isExpanded && !isHovered
+                } cursor-pointer ${!isExpanded
                   ? "lg:justify-center"
                   : "lg:justify-start"
                 }`}
@@ -223,10 +212,10 @@ const AppSidebar: React.FC = () => {
               >
                 {nav.icon}
               </span>
-              {(isExpanded || isHovered || isMobileOpen) && (
+              {(isExpanded || isMobileOpen) && (
                 <span className="menu-item-text">{nav.name}</span>
               )}
-              {(isExpanded || isHovered || isMobileOpen) && (
+              {(isExpanded || isMobileOpen) && (
                 <ChevronDownIcon
                   className={`ml-auto w-5 h-5 transition-transform duration-200 ${openSubmenu?.type === menuType &&
                     openSubmenu?.index === index
@@ -251,13 +240,46 @@ const AppSidebar: React.FC = () => {
                 >
                   {nav.icon}
                 </span>
-                {(isExpanded || isHovered || isMobileOpen) && (
-                  <span className="menu-item-text">{nav.name}</span>
+                {(isExpanded || isMobileOpen) && (
+                  <>
+                    <span className="menu-item-text">{nav.name}</span>
+                    <span className="flex items-center gap-1 ml-auto">
+                      {nav.new && (
+                        <span
+                          className={`ml-auto ${isActive(nav.path || "")
+                            ? "menu-dropdown-badge-active"
+                            : "menu-dropdown-badge-inactive"
+                            } menu-dropdown-badge`}
+                        >
+                          new
+                        </span>
+                      )}
+                      {nav.pro && (
+                        <span
+                          className={`ml-auto ${isActive(nav.path || "")
+                            ? "menu-dropdown-badge-active"
+                            : "menu-dropdown-badge-inactive"
+                            } menu-dropdown-badge`}
+                        >
+                          pro
+                        </span>
+                      )}
+                    </span>
+                  </>
                 )}
               </Link>
             )
           )}
-          {nav.subItems && (isExpanded || isHovered || isMobileOpen) && (
+          {/* Tooltip - only visible when sidebar is collapsed */}
+          {!isExpanded && !isMobileOpen && (
+            <div className="fixed left-[90px] ml-2 px-3 py-2 bg-gray-900 dark:bg-gray-800 text-white text-sm rounded-md shadow-lg opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all duration-200 whitespace-nowrap z-[9999] pointer-events-none"
+              style={{ top: 'auto', transform: 'translateY(-50%)' }}
+            >
+              {nav.name}
+              <div className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1 w-2 h-2 bg-gray-900 dark:bg-gray-800 rotate-45"></div>
+            </div>
+          )}
+          {nav.subItems && (isExpanded || isMobileOpen) && (
             <div
               ref={(el) => {
                 subMenuRefs.current[`${menuType}-${index}`] = el;
@@ -316,25 +338,21 @@ const AppSidebar: React.FC = () => {
 
   return (
     <aside
-      className={`fixed mt-14 flex flex-col lg:mt-0 top-0 px-6 left-0 bg-white dark:bg-gray-900 dark:border-gray-800 text-gray-900 h-screen transition-all duration-300 ease-in-out z-50 border-r border-gray-200 
+      className={`fixed mt-10 flex flex-col lg:mt-0 top-0 px-6 left-0 bg-white dark:bg-gray-900 dark:border-gray-800 text-gray-900 h-screen transition-all duration-300 ease-in-out z-50 border-r border-gray-200 
         ${isExpanded || isMobileOpen
-          ? "w-[270px]"
-          : isHovered
-            ? "w-[270px]"
-            : "w-[80px]"
+          ? "w-[250px]"
+          : "w-[80px]"
         }
         ${isMobileOpen ? "translate-x-0" : "-translate-x-full"}
         lg:translate-x-0`}
-      onMouseEnter={() => !isExpanded && setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
     >
       <div
-        className={`py-8 flex flex-col items-center ${!isExpanded && !isHovered ? "lg:justify-center" : "justify-center"
+        className={`py-6 flex flex-col items-center ${!isExpanded ? "lg:justify-center" : "justify-center"
           }`}
       >
         <Link to="/" className="flex flex-col items-center gap-3">
           {/* Circular Avatar */}
-          <div className={`${isExpanded || isHovered || isMobileOpen ? "w-20 h-20" : "w-12 h-12"} rounded-full overflow-hidden border-4 border-primary shadow-lg transition-all duration-300`}>
+          <div className={`${isExpanded || isMobileOpen ? "w-20 h-20" : "w-12 h-12"} rounded-full overflow-hidden border-4 border-primary shadow-lg transition-all duration-300`}>
             <img
               src={getAvatarUrl()}
               alt={user?.fullName || user?.email || "User"}
@@ -343,7 +361,7 @@ const AppSidebar: React.FC = () => {
           </div>
 
           {/* LUCOSMS Text - Only show when expanded */}
-          {(isExpanded || isHovered || isMobileOpen) && (
+          {(isExpanded || isMobileOpen) && (
             <div className="text-center">
               <h3 className="text-xl font-bold text-gray-900 dark:text-white tracking-wide">
                 LUCOSMS
@@ -356,11 +374,11 @@ const AppSidebar: React.FC = () => {
         </Link>
       </div>
       <div className="flex flex-col overflow-y-auto duration-300 ease-linear no-scrollbar">
-        <nav className="mb-6">
+        <nav className="mb-4">
           <div className="flex flex-col gap-4">
             <div>
               <h2
-                className={`mb-4 text-xs uppercase flex text-gray-400 ${!isExpanded && !isHovered
+                className={`mb-4 text-xs uppercase flex text-gray-400 ${!isExpanded
                   ? "lg:justify-center"
                   : "justify-start"
                   }`}
@@ -368,22 +386,22 @@ const AppSidebar: React.FC = () => {
               {renderMenuItems(navItems, "main")}
             </div>
             <div className="">
+              {renderMenuItems(developerItems, "developer")}
+            </div>
+            <div className="">
               <h2
-                className={`mb-4 text-xs uppercase flex  text-gray-400 ${!isExpanded && !isHovered
+                className={`mb-4 text-xs uppercase flex  text-gray-400 ${!isExpanded
                   ? "lg:justify-center"
                   : "justify-start"
                   }`}
               ></h2>
               {renderMenuItems(othersItems, "others")}
             </div>
-            <div className="mt-6">
-              {renderMenuItems(developerItems, "developer")}
-            </div>
 
             {user?.isSuperuser && (
               <div className="mt-6">
                 <h2
-                  className={`mb-4 text-xs uppercase flex text-gray-400 ${!isExpanded && !isHovered
+                  className={`mb-4 text-xs uppercase flex text-gray-400 ${!isExpanded
                     ? "lg:justify-center"
                     : "justify-start"
                     }`}
@@ -395,7 +413,7 @@ const AppSidebar: React.FC = () => {
             )}
           </div>
         </nav>
-        {isExpanded || isHovered || isMobileOpen ? <SidebarWidget /> : null}
+        {isExpanded || isMobileOpen}
       </div>
     </aside>
   );

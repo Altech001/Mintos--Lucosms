@@ -29,6 +29,7 @@ import ListTemplates from "./pages/Template/ListTemplates";
 import Tage from "./pages/Template/Tage";
 import Whatsapp from "./pages/UnderDev/Whatsapp";
 import ApiDoc from "./pages/Docs/Docs";
+import ShareCredits from "./pages/Share/sharecredits";
 
 export default function App() {
   return (
@@ -58,6 +59,7 @@ export default function App() {
               <Route path="/developer/api-keys" element={<ApiKeysPage />} />
               <Route path="/special-message" element={<SpecialMge />} />
               <Route path="/api_doc" element={<ApiDoc />} />
+              <Route path="/share-credits" element={<ShareCredits />} />
             </Route>
           </Route>
 

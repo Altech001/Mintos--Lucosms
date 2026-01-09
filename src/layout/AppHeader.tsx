@@ -125,24 +125,16 @@ const AppHeader: React.FC = () => {
 
           {/* Wallet and also plan */}
           <WalletButton />
-        <LowBalanceAlert />
-        <Link to="https://chat.whatsapp.com/BC5YiZHV7zAJwY1cbCC6ii" target="_blank" className="hidden lg:block">
-        <img
-          className="hidden lg:block"
-          src="./images/chat/wap1.svg"
-          alt="Logo"
-          width={80}
-          height={80}
-        />
-        </Link>
+          <LowBalanceAlert />
+
+          <PlanButton />
+
         </div>
         <div
-          className={`${
-            isApplicationMenuOpen ? "flex" : "hidden"
-          } items-center justify-between w-full gap-4 px-5 py-4 lg:flex shadow-theme-md lg:justify-end lg:px-0 lg:shadow-none`}
+          className={`${isApplicationMenuOpen ? "flex" : "hidden"
+            } items-center justify-between w-full gap-4 px-5 py-4 lg:flex shadow-theme-md lg:justify-end lg:px-0 lg:shadow-none`}
         >
           <div className="flex items-center gap-2 2xsm:gap-3">
-            <PlanButton />
             {/* <!-- Dark Mode Toggler --> */}
             <ThemeToggleButton />
             {/* <!-- Dark Mode Toggler --> */}

@@ -153,7 +153,7 @@ export default function RecentOrders() {
                     })}
                   </TableCell>
                   <TableCell className="py-3 px-4 text-gray-700 text-theme-sm dark:text-gray-300 min-w-[300px]">
-                    <div className="line-clamp-1.8">
+                    <div className="line-clamp-1">
                       {sms.message}
                     </div>
                   </TableCell>

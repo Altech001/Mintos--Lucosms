@@ -87,6 +87,16 @@ export interface UserDataGetUpgradeRecommendationRequest {
     upgradeRecommendationRequest: UpgradeRecommendationRequest;
 }
 
+export interface UserDataVerifyRecipientRequest {
+    identifier: string;
+}
+
+export interface UserDataShareCreditsRequest {
+    recipientIdentifier: string;
+    amount: number;
+    description?: string;
+}
+
 /**
  * UserDataApi - interface
  * 
@@ -314,6 +324,38 @@ export interface UserDataApiInterface {
      * Get Wallet Balance
      */
     userDataGetWalletBalance(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<WalletResponse>;
+
+    /**
+     * Verify a recipient by email or identifier.
+     * @summary Verify Recipient
+     * @param {string} identifier 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof UserDataApiInterface
+     */
+    userDataVerifyRecipientRaw(requestParameters: UserDataVerifyRecipientRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<any>>;
+
+    /**
+     * Verify a recipient by email or identifier.
+     * Verify Recipient
+     */
+    userDataVerifyRecipient(requestParameters: UserDataVerifyRecipientRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<any>;
+
+    /**
+     * Share credits with another user.
+     * @summary Share Credits
+     * @param {UserDataShareCreditsRequest} requestParameters 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof UserDataApiInterface
+     */
+    userDataShareCreditsRaw(requestParameters: UserDataShareCreditsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<any>>;
+
+    /**
+     * Share credits with another user.
+     * Share Credits
+     */
+    userDataShareCredits(requestParameters: UserDataShareCreditsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<any>;
 
 }
 
@@ -927,6 +969,108 @@ export class UserDataApi extends runtime.BaseAPI implements UserDataApiInterface
      */
     async userDataGetWalletBalance(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<WalletResponse> {
         const response = await this.userDataGetWalletBalanceRaw(initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Verify a recipient by email or identifier.
+     * Verify Recipient
+     */
+    async userDataVerifyRecipientRaw(requestParameters: UserDataVerifyRecipientRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<any>> {
+        if (requestParameters['identifier'] == null) {
+            throw new runtime.RequiredError(
+                'identifier',
+                'Required parameter "identifier" was null or undefined when calling userDataVerifyRecipient().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        if (requestParameters['identifier'] != null) {
+            queryParameters['identifier'] = requestParameters['identifier'];
+        }
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        if (this.configuration && this.configuration.accessToken) {
+            // oauth required
+            headerParameters["Authorization"] = await this.configuration.accessToken("OAuth2PasswordBearer", []);
+        }
+
+        let urlPath = `/api/v1/user-data/wallet/verify-recipient`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse<any>(response);
+    }
+
+    /**
+     * Verify a recipient by email or identifier.
+     * Verify Recipient
+     */
+    async userDataVerifyRecipient(requestParameters: UserDataVerifyRecipientRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<any> {
+        const response = await this.userDataVerifyRecipientRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Share credits with another user.
+     * Share Credits
+     */
+    async userDataShareCreditsRaw(requestParameters: UserDataShareCreditsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<any>> {
+        if (requestParameters['recipientIdentifier'] == null) {
+            throw new runtime.RequiredError(
+                'recipientIdentifier',
+                'Required parameter "recipientIdentifier" was null or undefined when calling userDataShareCredits().'
+            );
+        }
+
+        if (requestParameters['amount'] == null) {
+            throw new runtime.RequiredError(
+                'amount',
+                'Required parameter "amount" was null or undefined when calling userDataShareCredits().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+        if (this.configuration && this.configuration.accessToken) {
+            // oauth required
+            headerParameters["Authorization"] = await this.configuration.accessToken("OAuth2PasswordBearer", []);
+        }
+
+        let urlPath = `/api/v1/user-data/wallet/share-credits`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: {
+                recipient_identifier: requestParameters['recipientIdentifier'],
+                amount: requestParameters['amount'],
+                description: requestParameters['description'],
+            },
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse<any>(response);
+    }
+
+    /**
+     * Share credits with another user.
+     * Share Credits
+     */
+    async userDataShareCredits(requestParameters: UserDataShareCreditsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<any> {
+        const response = await this.userDataShareCreditsRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
