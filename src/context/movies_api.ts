@@ -14,6 +14,33 @@ export interface MovieResponse {
   category_name: string | null;
 }
 
+export interface Episode {
+  id: number;
+  name: string;
+  video_url: string;
+  poster_url: string;
+  genre: string;
+  stars: number;
+  vj_name: string;
+  created_at: string;
+  serie_id: number;
+}
+
+export interface SeriesResponse {
+  id: number;
+  name: string;
+  poster_url: string;
+  genre: string;
+  stars: number;
+  vj_name: string;
+  duration: string;
+  description: string;
+  category_name: string;
+  release_date: string | null;
+  created_at: string;
+  episodes: Episode[];
+}
+
 const API_BASE_URL = 'https://mintos-vd.vercel.app';
 
 export interface DonationData {
@@ -188,6 +215,36 @@ export const moviesApi = {
 
     if (!response.ok) {
       throw new Error(`Failed to check transaction status: ${response.statusText}`);
+    }
+
+    return response.json();
+  },
+
+  getSeries: async (): Promise<SeriesResponse[]> => {
+    const response = await fetch(`${API_BASE_URL}/series/`, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch series: ${response.statusText}`);
+    }
+
+    return response.json();
+  },
+
+  getSeriesById: async (id: number): Promise<SeriesResponse> => {
+    const response = await fetch(`${API_BASE_URL}/series/${id}/`, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch series ${id}: ${response.statusText}`);
     }
 
     return response.json();

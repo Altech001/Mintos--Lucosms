@@ -9,6 +9,7 @@ import { ThemeProvider } from "./context/ThemeContext.tsx";
 import { AuthProvider } from "./context/AuthContext.tsx";
 import { ToastProvider } from "./context/ToastContext.tsx";
 import { MovieProvider } from "./context/MovieContext.tsx";
+import { SeriesProvider } from "./context/SeriesContext.tsx";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 const queryClient = new QueryClient();
@@ -20,9 +21,11 @@ createRoot(document.getElementById("root")!).render(
         <QueryClientProvider client={queryClient}>
           <ToastProvider>
             <MovieProvider>
-              <AppWrapper>
-                <App />
-              </AppWrapper>
+              <SeriesProvider>
+                <AppWrapper>
+                  <App />
+                </AppWrapper>
+              </SeriesProvider>
             </MovieProvider>
           </ToastProvider>
         </QueryClientProvider>

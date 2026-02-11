@@ -31,6 +31,7 @@ import Whatsapp from "./pages/UnderDev/Whatsapp";
 import ApiDoc from "./pages/Docs/Docs";
 import ShareCredits from "./pages/Share/sharecredits";
 import Movies from "./pages/Movies/Movies";
+import Series from "./pages/Movies/Series";
 import Airtime from "./pages/Logs/Airtime";
 
 export default function App() {
@@ -82,6 +83,7 @@ export default function App() {
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/movies" element={<Movies />} />
+          <Route path="/series" element={<Series />} />
           {/* Fallback Route */}
           <Route path="*" element={<NotFound />} />
         </Routes>

@@ -22,6 +22,7 @@ import { MovieResponse } from '@/context/movies_api';
 import { useToast } from '@/context/ToastContext';
 import AdsLeft from './AdsLeft';
 import DonationDialog from './DonationDialog';
+import { useNavigate } from 'react-router';
 
 const ArtPlayerComponent: React.FC<{ url: string; poster: string }> = ({ url, poster }) => {
     const artRef = useRef<HTMLDivElement>(null);
@@ -103,6 +104,7 @@ const Movies: React.FC = () => {
     const [selectedMovie, setSelectedMovie] = useState<MovieResponse | null>(null);
     const observerTarget = useRef<HTMLDivElement>(null);
     const scrollPositionRef = useRef<number>(0);
+    const navigate = useNavigate();
 
     const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
     const [requestData, setRequestData] = useState({ name: '', reason: '' });
@@ -293,6 +295,14 @@ const Movies: React.FC = () => {
                             </div>
                             {/* Desktop-only theme toggle in search row */}
                             <div className="hidden sm:flex items-center gap-2 ml-auto">
+                                <Button
+                                    className='rounded-none bg-brand-500 hover:bg-brand-600 text-xs'
+                                    startIcon={<PlusCircle size={14} />}
+                                    onClick={() => navigate('/series')}
+                                >
+                                    <span className="hidden md:inline">Series</span>
+                                    <span className="md:hidden">Series</span>
+                                </Button>
                                 <Button
                                     className='rounded-none bg-brand-500 hover:bg-brand-600 text-xs'
                                     startIcon={<PlusCircle size={14} />}
