@@ -1,13 +1,12 @@
-import { useEffect, useState, useCallback } from "react";
-import { useAuth } from "../../context/AuthContext";
 import { apiClient } from "@/lib/api/client";
-import Button from "../../components/ui/button/Button";
 import { PlanInfo } from "@/lib/api/models";
-import Skeleton from "../../components/ui/Skeleton";
+import { useCallback, useEffect, useState } from "react";
 import Input from "../../components/form/input/InputField";
-import QRCode from "react-qr-code";
+import Button from "../../components/ui/button/Button";
+import Skeleton from "../../components/ui/Skeleton";
+import { useAuth } from "../../context/AuthContext";
 
-import { CheckCircle, User, Phone, FileText, Send } from "lucide-react";
+import { CheckCircle, FileText, Phone, Send, User } from "lucide-react";
 
 export default function SettingsPage() {
   const { user, checkAuth, logout } = useAuth();
@@ -168,7 +167,7 @@ export default function SettingsPage() {
       });
       setPromoSuccess(
         response.message ||
-          `Promo code applied! New SMS cost: ${response.newSmsCost} UGX (saved ${response.savingsPerSms} UGX per SMS)`
+        `Promo code applied! New SMS cost: ${response.newSmsCost} UGX (saved ${response.savingsPerSms} UGX per SMS)`
       );
       setPromoCode("");
       setIsPromoModalOpen(false); // Close modal on success
@@ -219,62 +218,41 @@ export default function SettingsPage() {
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
         {isLoadingPlans
           ? Array.from({ length: 4 }).map((_, index) => (
-              <div
-                key={index}
-                className="p-6 bg-white rounded-lg shadow-md dark:bg-gray-800"
-              >
-                <Skeleton className="w-1/2 h-7" />
-                <Skeleton className="w-1/3 h-10 mt-2" />
-                <Skeleton className="w-full h-4 mt-4" />
-                <div className="mt-6 space-y-2">
-                  <Skeleton className="w-3/4 h-4" />
-                  <Skeleton className="w-2/3 h-4" />
-                  <Skeleton className="w-1/2 h-4" />
-                </div>
+            <div
+              key={index}
+              className="p-6 bg-white rounded-lg shadow-md dark:bg-gray-800"
+            >
+              <Skeleton className="w-1/2 h-7" />
+              <Skeleton className="w-1/3 h-10 mt-2" />
+              <Skeleton className="w-full h-4 mt-4" />
+              <div className="mt-6 space-y-2">
+                <Skeleton className="w-3/4 h-4" />
+                <Skeleton className="w-2/3 h-4" />
+                <Skeleton className="w-1/2 h-4" />
               </div>
-            ))
+            </div>
+          ))
           : Object.values(plans).map((plan) => (
-              <div
-                key={plan.planName}
-                className={`p-6 border rounded-lg cursor-pointer ${
-                  user?.planSub === plan.planName
-                    ? "border-brand-500 bg-white dark:bg-brand-500/20"
-                    : "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700"
+            <div
+              key={plan.planName}
+              className={`p-6 rounded-none cursor-pointer ${user?.planSub === plan.planName
+                ? "border-brand-500 border bg-white dark:bg-brand-500/20"
+                : "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700"
                 }`}
-                onClick={() => setSelectedPlan(plan.planName)}
-              >
-                <h2 className="text-xl font-semibold text-gray-800 dark:text-white">
-                  {plan.planName}
-                </h2>
-                <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
-                  {plan.smsCost}{" "}
-                  <span className="text-sm font-normal">UGX/SMS</span>
-                </p>
-                <p className="mt-4 text-sm text-gray-600 dark:text-gray-400">
-                  {plan.description}
-                </p>
-                <ul className="mt-6 space-y-2 text-sm text-gray-600 dark:text-gray-400">
-                  {plan.features.map((feature) => (
-                    <li key={feature} className="flex items-center gap-2">
-                      <svg
-                        className="w-4 h-4 text-green-500"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth="2"
-                          d="M5 13l4 4L19 7"
-                        ></path>
-                      </svg>
-                      <span>{feature}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
+              onClick={() => setSelectedPlan(plan.planName)}
+            >
+              <h2 className="text-xl font-semibold text-gray-800 dark:text-white">
+                {plan.planName}
+              </h2>
+              <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
+                {plan.smsCost}{" "}
+                <span className="text-sm font-normal">UGX/SMS</span>
+              </p>
+              <p className="mt-4 text-sm text-gray-600 dark:text-gray-400">
+                {plan.description}
+              </p>
+            </div>
+          ))}
       </div>
 
       {selectedPlan && (
@@ -352,40 +330,6 @@ export default function SettingsPage() {
         </Button>
       </div>
 
-      {/* 2 Factor Authentication Zone */}
-      <div className="mt-12 flex flex-row justify-between border-t border-gray-200 dark:border-white/10 pt-8">
-        <div>
-          <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-3">
-            2 Factor Authentication
-          </h2>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-            Add an authentication layer to your account.
-          </p>
-          <Button
-            variant="primary"
-            onClick={() => {
-              
-            }}
-          >
-            Add 2FA Method
-          </Button>
-        </div>
-
-        <div className=" flex flex-col items-center justify-center">
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            Scan Qr Code
-          </p>
-          <div className="w-32 h-32 bg-gray-200 dark:bg-gray-700 rounded-lg flex items-center justify-center">
-            <QRCode
-              value="otpauth://totp/YourApp:username?secret=  JBSWY3DPEHPK3PXP&issuer=YourApp"
-              size={80}
-              style={{borderRadius:2}}
-              viewBox={`0 0 256 256`}
-            />
-          </div>
-        </div>
-      </div>
-
       {/* Danger Zone */}
       <div className="mt-12 border-t border-gray-200 dark:border-white/10 pt-8">
         <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-3">
@@ -402,6 +346,7 @@ export default function SettingsPage() {
             setDeleteConfirmText("");
             setDeleteError(null);
           }}
+          className="rounded-none"
         >
           Delete Account
         </Button>
@@ -410,7 +355,7 @@ export default function SettingsPage() {
       {/* Change Plan Modal */}
       {isChangePlanModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl max-w-lg w-full p-6">
+          <div className="bg-white dark:bg-gray-900 rounded-none shadow-xl max-w-lg w-full p-6">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
               Request Plan Change
             </h3>
@@ -513,7 +458,7 @@ export default function SettingsPage() {
       {/* Low Balance Threshold Modal */}
       {isLowBalanceModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl max-w-lg w-full p-6">
+          <div className="bg-white dark:bg-gray-900 rounded-none shadow-xl max-w-lg w-full p-6">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
               Set Low Balance Alert Threshold
             </h3>
@@ -560,7 +505,7 @@ export default function SettingsPage() {
       {/* Promo Code Modal */}
       {isPromoModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl max-w-lg w-full p-6">
+          <div className="bg-white dark:bg-gray-900 rounded-none shadow-xl max-w-lg w-full p-6">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
               Apply Promo Code
             </h3>
@@ -602,7 +547,7 @@ export default function SettingsPage() {
       {/* Preview & Submit Modal */}
       {isPreviewModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl dark:bg-gray-900">
+          <div className="w-full max-w-md rounded-none bg-white p-6 shadow-2xl dark:bg-gray-900">
             <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
               Review Your Request
             </h3>
@@ -714,7 +659,7 @@ export default function SettingsPage() {
       {/* Delete Account Modal */}
       {isDeleteModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl max-w-lg w-full p-6">
+          <div className="bg-white dark:bg-gray-900 rounded-none shadow-xl max-w-lg w-full p-6">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
               Confirm Account Deletion
             </h3>

@@ -140,7 +140,7 @@ export default function ListTemplates() {
       />
       <PageBreadcrumb pageTitle="Custom Templates and Pre-Made Templates" />
 
-      <div className="min-h-auto rounded-2xl border border-gray-200 bg-white px-5 py-7 dark:border-gray-800 dark:bg-white/3 xl:px-10">
+      <div className="min-h-auto rounded-none  bg-white px-5 py-7 dark:bg-white/3 xl:px-10">
 
         {/* Header */}
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -201,11 +201,10 @@ export default function ListTemplates() {
               >
                 {/* Tag */}
                 <div className="absolute -top-3 left-4">
-                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
-                    (template.tag ?? 'custom') === 'custom'
-                      ? 'bg-brand-100 text-brand-800 dark:bg-brand-900/20 dark:text-brand-300'
-                      : 'bg-gray-100 text-gray-800 dark:bg-white/10 dark:text-gray-300'
-                  }`}>
+                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${(template.tag ?? 'custom') === 'custom'
+                    ? 'bg-brand-100 text-brand-800 dark:bg-brand-900/20 dark:text-brand-300'
+                    : 'bg-gray-100 text-gray-800 dark:bg-white/10 dark:text-gray-300'
+                    }`}>
                     {template.tag ?? 'custom'}
                   </span>
                 </div>
@@ -309,8 +308,8 @@ export default function ListTemplates() {
 
       {/* Create/Edit Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl max-w-lg w-full p-6 space-y-5">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50000 p-4">
+          <div className="bg-white dark:bg-gray-900 rounded-none shadow-xl max-w-lg w-full p-6 space-y-5">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{editing ? 'Edit Template' : 'Create New Template'}</h3>
 
             <div>

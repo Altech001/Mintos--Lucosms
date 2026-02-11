@@ -5,6 +5,8 @@ import RecentOrders from "../../components/ecommerce/RecentOrders";
 import SalesCategoryChart from "../../components/ecommerce/SalesCategorgy";
 import StatisticsChart from "../../components/ecommerce/StatisticsChart";
 import MiniGraph from "../../components/ecommerce/MiniGraph";
+import { Swiper, SwiperSlide } from "swiper/react";
+import { Autoplay, Pagination } from "swiper/modules";
 
 export default function Home() {
   return (
@@ -25,10 +27,26 @@ export default function Home() {
 
         <div className="col-span-12 space-y-6 xl:col-span-5 ">
           <MiniGraph />
-          <DemographicCard />
-
-
-          <SalesCategoryChart />
+          <Swiper
+            modules={[Autoplay, Pagination]}
+            spaceBetween={24}
+            slidesPerView={1}
+            loop={true}
+            autoHeight={true}
+            autoplay={{
+              delay: 5000,
+              disableOnInteraction: false,
+            }}
+            pagination={{ clickable: true }}
+            className="rounded-none shadow"
+          >
+            <SwiperSlide>
+              <DemographicCard />
+            </SwiperSlide>
+            <SwiperSlide>
+              <SalesCategoryChart />
+            </SwiperSlide>
+          </Swiper>
         </div>
 
       </div>

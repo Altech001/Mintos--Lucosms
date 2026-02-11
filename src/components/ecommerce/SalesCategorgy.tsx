@@ -176,7 +176,7 @@ export default function SalesCategoryChart() {
   const estimatedSmsCount = userStats?.estimatedSmsCount || 0;
 
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-2 dark:border-gray-800 dark:bg-white/[0.03] sm:p-6">
+    <div className=" bg-white p-2 dark:bg-white/[0.03] sm:p-6">
       {/* Header */}
       <div className="mb-2 flex items-center justify-between">
         <div>
@@ -187,26 +187,26 @@ export default function SalesCategoryChart() {
             Distribution by sales channel
           </p>
         </div>
-        <button className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-white/10 dark:hover:text-gray-300 transition-colors">
+        <button className=" p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-white/10 dark:hover:text-gray-300 transition-colors">
           <Package className="h-5 w-5" />
         </button>
       </div>
 
       {/* Stats Cards */}
       <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <div className="rounded-lg bg-gray-50 dark:bg-gray-900/50 p-3">
+        <div className=" bg-gray-50 dark:bg-gray-900/50 p-3">
           <p className="text-xs font-medium text-gray-600 dark:text-gray-400">Balance</p>
           <p className="mt-1 text-sm font-bold text-gray-900 dark:text-white">
             UGx{balance.toFixed(2)}
           </p>
         </div>
-        <div className="rounded-lg bg-gray-50 dark:bg-gray-900/50 p-3">
+        <div className=" bg-gray-50 dark:bg-gray-900/50 p-3">
           <p className="text-xs font-medium text-gray-600 dark:text-gray-400">SMS Cost</p>
           <p className="mt-1 text-sm font-bold text-gray-900 dark:text-white">
             UGx{smsCost.toFixed(4)}
           </p>
         </div>
-        <div className="rounded-lg bg-gray-50 dark:bg-gray-900/50 p-3">
+        <div className=" bg-gray-50 dark:bg-gray-900/50 p-3">
           <p className="text-xs font-medium text-gray-600 dark:text-gray-400">Available SMS</p>
           <p className="mt-1 text-xl font-bold text-gray-900 dark:text-white">
             {estimatedSmsCount.toLocaleString()}
@@ -231,7 +231,7 @@ export default function SalesCategoryChart() {
           {categories.map((cat, index) => (
             <div
               key={index}
-              className={`flex items-center justify-between p-3 rounded-lg transition-colors cursor-pointer ${activeIndex === index
+              className={`flex items-center justify-between p-3  transition-colors cursor-pointer ${activeIndex === index
                 ? 'bg-gray-100 dark:bg-white/10'
                 : 'hover:bg-gray-50 dark:hover:bg-white/5'
                 }`}

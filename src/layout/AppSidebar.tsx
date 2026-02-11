@@ -197,7 +197,7 @@ const AppSidebar: React.FC = () => {
             <button
               onClick={() => handleSubmenuToggle(index, menuType)}
               className={`menu-item group ${openSubmenu?.type === menuType && openSubmenu?.index === index
-                ? "menu-item-active"
+                ? "menu-item-active rounded-none"
                 : "menu-item-inactive"
                 } cursor-pointer ${!isExpanded
                   ? "lg:justify-center"
@@ -206,8 +206,8 @@ const AppSidebar: React.FC = () => {
             >
               <span
                 className={`menu-item-icon-size  ${openSubmenu?.type === menuType && openSubmenu?.index === index
-                  ? "menu-item-icon-active"
-                  : "menu-item-icon-inactive"
+                  ? "menu-item-icon-active rounded-none"
+                  : "menu-item-icon-inactive rounded-none"
                   }`}
               >
                 {nav.icon}
@@ -247,8 +247,8 @@ const AppSidebar: React.FC = () => {
                       {nav.new && (
                         <span
                           className={`ml-auto ${isActive(nav.path || "")
-                            ? "menu-dropdown-badge-active"
-                            : "menu-dropdown-badge-inactive"
+                            ? "menu-dropdown-badge-active rounded-none"
+                            : "menu-dropdown-badge-inactive rounded-none"
                             } menu-dropdown-badge`}
                         >
                           new
@@ -257,8 +257,8 @@ const AppSidebar: React.FC = () => {
                       {nav.pro && (
                         <span
                           className={`ml-auto ${isActive(nav.path || "")
-                            ? "menu-dropdown-badge-active"
-                            : "menu-dropdown-badge-inactive"
+                            ? "menu-dropdown-badge-active rounded-none"
+                            : "menu-dropdown-badge-inactive rounded-none"
                             } menu-dropdown-badge`}
                         >
                           pro
@@ -272,7 +272,7 @@ const AppSidebar: React.FC = () => {
           )}
           {/* Tooltip - only visible when sidebar is collapsed */}
           {!isExpanded && !isMobileOpen && (
-            <div className="fixed left-[90px] ml-2 px-3 py-2 bg-gray-900 dark:bg-gray-800 text-white text-sm rounded-md shadow-lg opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all duration-200 whitespace-nowrap z-[9999] pointer-events-none"
+            <div className="fixed left-[90px] ml-2 px-3 py-2 bg-gray-900 dark:bg-gray-800 text-white text-sm rounded-none shadow-lg opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all duration-200 whitespace-nowrap z-[9999] pointer-events-none"
               style={{ top: 'auto', transform: 'translateY(-50%)' }}
             >
               {nav.name}
@@ -284,7 +284,7 @@ const AppSidebar: React.FC = () => {
               ref={(el) => {
                 subMenuRefs.current[`${menuType}-${index}`] = el;
               }}
-              className="overflow-hidden transition-all duration-300"
+              className="overflow-hidden transition-all duration-300 rounded-none"
               style={{
                 height:
                   openSubmenu?.type === menuType && openSubmenu?.index === index
@@ -350,7 +350,7 @@ const AppSidebar: React.FC = () => {
         className={`py-6 flex flex-col items-center ${!isExpanded ? "lg:justify-center" : "justify-center"
           }`}
       >
-        <Link to="/" className="flex flex-col items-center gap-3">
+        <Link to="/" className="flex flex-row items-center gap-3">
           {/* Circular Avatar */}
           <div className={`${isExpanded || isMobileOpen ? "w-20 h-20" : "w-12 h-12"} rounded-full overflow-hidden border-4 border-primary shadow-lg transition-all duration-300`}>
             <img
@@ -366,9 +366,9 @@ const AppSidebar: React.FC = () => {
               <h3 className="text-xl font-bold text-gray-900 dark:text-white tracking-wide">
                 LUCOSMS
               </h3>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              {/* <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                 {user?.fullName || user?.email || "User"}
-              </p>
+              </p> */}
             </div>
           )}
         </Link>

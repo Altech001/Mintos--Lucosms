@@ -35,7 +35,7 @@ export default function WalletButton() {
       onClick={handleRefresh}
       size="md"
       variant="outline"
-      className="relative flex items-center gap-2 font-medium transition-all hover:border-brand-400 hover:text-brand-600 dark:hover:border-brand-500 dark:hover:text-brand-400"
+      className="relative flex items-center gap-2 font-medium rounded-none shadow-xs transition-all hover:border-brand-400 hover:text-brand-600 dark:hover:border-brand-500 dark:hover:text-brand-400"
       disabled={isLoading || isRefreshing}
     >
       <Wallet className="h-4 w-4" />

@@ -106,7 +106,7 @@ export default function DemographicCard() {
     return stats.sort((a, b) => b.count - a.count);
   }, [smsHistory]);
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] sm:p-6">
+    <div className="bg-white p-5 dark:bg-white/[0.03] sm:p-6 shadow">
       <div className="flex justify-between">
         <div>
           <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
@@ -140,7 +140,7 @@ export default function DemographicCard() {
           </Dropdown>
         </div>
       </div>
-      <div className="px-4 py-6 my-6 overflow-hidden border border-gary-200 rounded-2xl dark:border-gray-800 sm:px-6">
+      <div className="px-4 py-6 my-6 overflow-hidden border-gary-200 dark:border-gray-800 sm:px-6">
         <div
           id="mapOne"
           className="mapOne map-btn -mx-4 -my-6 h-[212px] w-[252px] 2xsm:w-[307px] xsm:w-[358px] sm:-mx-6 md:w-[668px] lg:w-[634px] xl:w-[393px] 2xl:w-[554px]"
@@ -162,10 +162,10 @@ export default function DemographicCard() {
                   <img src={network.logo} alt={network.name} />
                 </div>
                 <div>
-                  <p className="font-semibold text-gray-800 text-theme-sm dark:text-white/90">
+                  <p className="font-normal text-gray-800 text-base dark:text-white/90">
                     {network.name}
                   </p>
-                  <span className="block text-gray-500 text-theme-xs dark:text-gray-400">
+                  <span className="block text-gray-500 text-xs dark:text-gray-400">
                     {network.count.toLocaleString()} sms
                   </span>
                 </div>

@@ -144,7 +144,7 @@ export default function AutoTopUp() {
 
       // Ensure amount is an integer
       const amountInt = Math.round(amount);
-      const serviceFee = Math.round(amountInt * 0.10);
+      const serviceFee = Math.round(amountInt * 0.05);
       const totalCharge = amountInt + serviceFee;
 
       const payload = {
@@ -370,7 +370,7 @@ export default function AutoTopUp() {
       <div className="space-y-6">
 
         {/* Balance Hero Card */}
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-brand-500 via-brand-600 to-brand-700 p-6 text-white shadow-xl">
+        <div className="relative overflow-hidden rounded-none bg-gradient-to-br from-brand-500 via-brand-600 to-brand-700 p-6 text-white shadow">
           <div className="absolute inset-0 bg-black/10"></div>
           <div className="relative flex items-center justify-between">
             <div>
@@ -378,10 +378,7 @@ export default function AutoTopUp() {
               <p className="mt-2 text-3xl font-bold tracking-tight">
                 UGx {balance.toFixed(2)}
               </p>
-              <p className="mt-1 text-xs opacity-80 flex items-center gap-1">
-                <TrendingUp className="h-3 w-3" />
-                Auto Top-Up Enabled
-              </p>
+
               <div className="mt-3 flex items-center gap-2 text-xs opacity-90">
                 <Phone className="h-3.5 w-3.5" />
                 {phoneNumber ? (
@@ -397,10 +394,10 @@ export default function AutoTopUp() {
 
             </div>
             <div className="flex items-center gap-3">
-              <Button variant="outline" onClick={() => setShowNumberModal(true)} className="bg-white/15 text-white border-white/30 hover:bg-white/25">
+              <Button variant="danger" onClick={() => setShowNumberModal(true)} className="bg-white/15 text-white border-white/30 hover:bg-white/25">
                 {phoneNumber ? 'Change Number' : 'Add Number'}
               </Button>
-              <div className="rounded-full bg-white/20 p-4 backdrop-blur-sm">
+              <div className="rounded-full p-4">
                 <BadgeCheck className="h-10 w-10" />
               </div>
             </div>
@@ -435,7 +432,7 @@ export default function AutoTopUp() {
 
         {/* Tab Content */}
         {activeTab === 'topup' ? (
-          <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
+          <div className="bg-white p-6  dark:bg-white/[0.03]">
             <h3 className="mb-5 text-lg font-semibold text-gray-800 dark:text-white/90">
               Quick Top-Up
             </h3>
@@ -473,7 +470,7 @@ export default function AutoTopUp() {
                 <Loader2 className="h-8 w-8 animate-spin text-brand-600" />
               </div>
             ) : transactions.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-12 text-center dark:border-gray-700 dark:bg-white/5">
+              <div className="rounded border border-dashed border-gray-300 bg-gray-50 p-12 text-center dark:border-gray-700 dark:bg-white/5">
                 <Clock className="mx-auto h-12 w-12 text-gray-400" />
                 <p className="mt-3 text-gray-500 dark:text-gray-400">No transaction history yet.</p>
               </div>
@@ -481,8 +478,8 @@ export default function AutoTopUp() {
               transactions.map((tx, i) => (
                 <div
                   key={tx.id}
-                  className={`flex items-center justify-between rounded-xl border p-4 transition-all ${tx.status === 'completed'
-                    ? 'border-green-200 bg-green-50/50 dark:border-green-900/30 dark:bg-green-900/10'
+                  className={`flex items-center justify-between rounded  p-4 transition-all ${tx.status === 'completed'
+                    ? 'border-green-900 bg-green-900/10 dark:border-green-900/30 dark:bg-green-900/10'
                     : tx.status === 'pending'
                       ? 'border-yellow-200 bg-yellow-50/50 dark:border-yellow-900/30 dark:bg-yellow-900/10'
                       : 'border-red-200 bg-red-50/50 dark:border-red-900/30 dark:bg-red-900/10'
@@ -526,7 +523,7 @@ export default function AutoTopUp() {
       {/* Top-Up Modal */}
       {showTopUpModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl dark:bg-gray-900">
+          <div className="w-full max-w-md rounded-none bg-white p-6 shadow-2xl dark:bg-gray-900">
             <div className="mb-6 flex items-center justify-between">
               <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
                 Enter Amount
@@ -562,11 +559,11 @@ export default function AutoTopUp() {
                     </div>
                     <div className="flex justify-between text-gray-600 dark:text-gray-400">
                       <span>Service Fee (5%):</span>
-                      <span>UGx {Math.round(Math.round(parseFloat(topUpAmount)) * 0.10).toLocaleString()}</span>
+                      <span>UGx {Math.round(Math.round(parseFloat(topUpAmount)) * 0.05).toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between border-t border-gray-200 pt-2 font-semibold text-gray-900 dark:border-gray-700 dark:text-white">
                       <span>Total to Pay:</span>
-                      <span>UGx {(Math.round(parseFloat(topUpAmount)) + Math.round(Math.round(parseFloat(topUpAmount)) * 0.10)).toLocaleString()}</span>
+                      <span>UGx {(Math.round(parseFloat(topUpAmount)) + Math.round(Math.round(parseFloat(topUpAmount)) * 0.05)).toLocaleString()}</span>
                     </div>
                   </div>
                 )}
@@ -602,7 +599,7 @@ export default function AutoTopUp() {
       {/* OTP Modal */}
       {showOTPModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl dark:bg-gray-900">
+          <div className="w-full max-w-md rounded-none bg-white p-6 shadow-2xl dark:bg-gray-900">
             <div className="mb-6 flex items-center gap-3">
               <div className="rounded-full bg-brand-100 p-2 dark:bg-brand-900/20">
                 <Shield className="h-5 w-5 text-brand-600 dark:text-brand-400" />
@@ -618,7 +615,7 @@ export default function AutoTopUp() {
             </div>
 
             <div className="space-y-5">
-              <div className="rounded-lg bg-blue-50 dark:bg-blue-900/20 p-4 text-center">
+              <div className="p-4 text-center">
                 <Loader2 className="mx-auto h-12 w-12 animate-spin text-brand-600 dark:text-brand-400" />
                 <p className="mt-3 text-sm font-medium text-gray-700 dark:text-gray-300">
                   Waiting for payment approval...
@@ -646,7 +643,7 @@ export default function AutoTopUp() {
       {/* Add/Change Number Modal */}
       {showNumberModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl dark:bg-gray-900">
+          <div className="w-full max-w-md rounded-none bg-white p-6 shadow-2xl dark:bg-gray-900">
             <div className="mb-6 flex items-center justify-between">
               <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
                 {phoneNumber ? 'Change Phone Number' : 'Add Phone Number'}

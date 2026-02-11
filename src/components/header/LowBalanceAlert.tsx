@@ -40,9 +40,8 @@ export default function LowBalanceAlert() {
   return (
     <Button
       onClick={handleClick}
-      className={`flex items-center gap-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-all duration-300 ${
-        isAnimating ? 'animate-pulse' : ''
-      }`}
+      className={`flex items-center gap-2 text-xs font-medium text-white bg-red-600 rounded-none hover:bg-red-700 transition-all duration-300 ${isAnimating ? 'animate-pulse' : ''
+        }`}
       title="Low balance alert - Click to manage settings"
     >
       <AlertTriangle className="w-4 h-4" />

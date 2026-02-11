@@ -31,6 +31,7 @@ import Whatsapp from "./pages/UnderDev/Whatsapp";
 import ApiDoc from "./pages/Docs/Docs";
 import ShareCredits from "./pages/Share/sharecredits";
 import Movies from "./pages/Movies/Movies";
+import Airtime from "./pages/Logs/Airtime";
 
 export default function App() {
   return (
@@ -61,6 +62,7 @@ export default function App() {
               <Route path="/special-message" element={<SpecialMge />} />
               <Route path="/api_doc" element={<ApiDoc />} />
               <Route path="/share-credits" element={<ShareCredits />} />
+              <Route path="/recharge-airtime" element={<Airtime />} />
 
             </Route>
           </Route>

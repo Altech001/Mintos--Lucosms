@@ -31,7 +31,7 @@ export default function PlanButton({
   return (
     <button
       onClick={onClick}
-      className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors ${getPlanStyles(plan)} ${className}`}
+      className={`inline-flex items-center gap-2 rounded-none border px-4 py-2.5 text-base font-normal transition-colors ${getPlanStyles(plan)} ${className}`}
       disabled={isLoading}
     >
       <Crown className="w-4 h-4" />

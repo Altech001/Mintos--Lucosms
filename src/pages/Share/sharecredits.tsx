@@ -218,7 +218,7 @@ const ShareCredits: React.FC = () => {
                 {/* Right Column: Information & Summary */}
                 <div className="space-y-6">
                     {/* Balance Card */}
-                    <div className="relative overflow-hidden rounded-2xl bg-brand-500 p-6 text-white shadow-lg">
+                    <div className="relative overflow-hidden bg-brand-500 p-6 text-white">
                         <div className="relative z-10">
                             <div className="flex items-center justify-between mb-4">
                                 <span className="text-sm font-medium text-brand-100">Available Balance</span>

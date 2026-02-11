@@ -1,11 +1,9 @@
 
 import { SystemStats, UserSearchResult } from '@/lib/api/models';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Activity, AlertCircle, ArrowUpRight, BarChart3, CheckSquare, CreditCard, MessageSquare, Plus, RefreshCw, Search, Square, Users } from 'lucide-react';
+import { Activity, BarChart3, CheckSquare, CreditCard, MessageSquare, Plus, RefreshCw, Search, Square, Users } from 'lucide-react';
 import { useState } from 'react';
-import Input from '../../components/form/input/InputField';
 import Button from '../../components/ui/button/Button';
-import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import AlertDialog from '../../components/ui/modal/AlertDialog';
 
 import { apiClient } from '@/lib/api/client';
@@ -124,19 +122,19 @@ function UserServices() {
   const queryClient = useQueryClient();
 
   // Real API calls
-  const { data: users = [], isLoading: usersLoading, error: usersError, refetch: refetchUsers } = useQuery<UserSearchResult[]>({
+  const { data: users = [], isLoading: usersLoading, refetch: refetchUsers } = useQuery<UserSearchResult[]>({
     queryKey: ['users', searchFilters],
     queryFn: () => fetchUsers(searchFilters),
     staleTime: 30000, // 30 seconds
   });
 
-  const { data: systemStats, isLoading: statsLoading, error: statsError } = useQuery<SystemStats>({
+  const { data: systemStats, isLoading: statsLoading } = useQuery<SystemStats>({
     queryKey: ['systemStats'],
     queryFn: fetchSystemStats,
     staleTime: 60000, // 1 minute
   });
 
-  const { data: smsAnalytics, isLoading: analyticsLoading, error: analyticsError } = useQuery<SMSAnalytics>({
+  const { data: smsAnalytics, isLoading: analyticsLoading, } = useQuery<SMSAnalytics>({
     queryKey: ['smsAnalytics'],
     queryFn: () => fetchSMSAnalytics(30),
     staleTime: 60000, // 1 minute
@@ -216,495 +214,348 @@ function UserServices() {
       .slice(0, 2);
   };
 
+  const SidebarItem = ({ id, label, icon: Icon }: { id: string, label: string, icon: any }) => (
+    <button
+      onClick={() => setActiveTab(id)}
+      className={`w-full flex items-center gap-3 px-6 py-4 transition-all duration-200 border-l-2 ${activeTab === id
+        ? 'bg-brand-50/50 border-brand-500 text-brand-600'
+        : 'border-transparent text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800'
+        }`}
+    >
+      <Icon className={`w-4 h-4 ${activeTab === id ? 'text-brand-500' : 'text-gray-400'}`} />
+      <span className={`text-[11px] font-bold uppercase  ${activeTab === id ? 'text-brand-600' : 'text-gray-600 dark:text-gray-400'}`}>
+        {label}
+      </span>
+    </button>
+  );
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="max-w-[1600px] mx-auto p-4 sm:p-8">
+      {/* Page Header */}
+      <div className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">User Services</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Manage users, analytics, and system operations</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">System Services</h1>
+          <p className="text-sm text-gray-400 dark:text-gray-400 mt-1 text-[10px] font-bold ">Administration / Services / Overview</p>
         </div>
-        <div className="flex gap-3">
-          <Button
-            onClick={handleRefreshAll}
-            variant="outline"
-            size="sm"
-            className="bg-white dark:bg-gray-800"
-          >
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Refresh Data
-          </Button>
-        </div>
+        <Button
+          onClick={handleRefreshAll}
+          variant="outline"
+          size="sm"
+          startIcon={<RefreshCw className={`w-4 h-4 ${(usersLoading || statsLoading) ? 'animate-spin' : ''}`} />}
+        >
+          SYNC DATA
+        </Button>
       </div>
 
-      {/* Stats Overview */}
-      {activeTab === 'analytics' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[
-            { label: 'Total Users', value: systemStats?.totalUsers || 0, icon: Users, color: 'blue', change: '+12%' },
-            { label: 'Active Users', value: systemStats?.activeUsers || 0, icon: Activity, color: 'emerald', change: '+5%' },
-            { label: 'SMS Sent', value: systemStats?.totalSmsSent || 0, icon: MessageSquare, color: 'violet', change: '+24%' },
-            { label: 'Transactions', value: systemStats?.totalTransactions || 0, icon: CreditCard, color: 'amber', change: '+8%' },
-          ].map((stat, i) => (
-            <div key={i} className="bg-white dark:bg-gray-800 rounded-xl p-5 border border-gray-100 dark:border-gray-700">
-              <div className="flex justify-between items-start">
-                <div>
-                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">{stat.label}</p>
-                  <h3 className="text-2xl font-bold text-gray-900 dark:text-white mt-2">{stat.value.toLocaleString()}</h3>
-                </div>
-                <div className={`p-2 rounded-lg bg-${stat.color}-50 dark:bg-${stat.color}-900/20 text-${stat.color}-600 dark:text-${stat.color}-400`}>
-                  <stat.icon className="w-5 h-5" />
-                </div>
+      <div className="flex flex-col lg:flex-row gap-8 items-start">
+        {/* Navigation Sidebar */}
+        <div className="w-full lg:w-64 flex-shrink-0 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 py-4 ">
+          <SidebarItem id="users" label="User Management" icon={Users} />
+          <SidebarItem id="analytics" label="Analytics & Stats" icon={BarChart3} />
+          <div className="mt-8 px-6">
+            <div className="h-px bg-gray-100 dark:bg-gray-800 mb-6"></div>
+            <div className="flex flex-col items-center gap-4 py-8">
+              <div className="w-16 h-16 bg-gray-50 dark:bg-gray-800 rounded-full flex items-center justify-center border border-gray-100 dark:border-gray-700">
+                <Users className="w-8 h-8 text-gray-300" />
               </div>
-              <div className="mt-4 flex items-center text-xs">
-                <span className="text-green-600 dark:text-green-400 flex items-center font-medium">
-                  <ArrowUpRight className="w-3 h-3 mr-1" />
-                  {stat.change}
-                </span>
-                <span className="text-gray-400 ml-2">from last month</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Tabs */}
-      <div className="border-b border-gray-200 dark:border-gray-700">
-        <nav className="-mb-px flex space-x-8" aria-label="Tabs">
-          <button
-            onClick={() => setActiveTab('users')}
-            className={`${activeTab === 'users'
-              ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
-              } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 transition-colors`}
-          >
-            <Users className="w-4 h-4" />
-            Users Management
-          </button>
-          <button
-            onClick={() => setActiveTab('analytics')}
-            className={`${activeTab === 'analytics'
-              ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
-              } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 transition-colors`}
-          >
-            <BarChart3 className="w-4 h-4" />
-            Analytics & Stats
-          </button>
-        </nav>
-      </div>
-
-      {activeTab === 'users' && (
-        <div className="space-y-6">
-          {/* Filters Toolbar */}
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700 flex flex-col md:flex-row gap-4 items-center justify-between">
-            <div className="relative w-full md:w-96">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Search className="h-4 w-4 text-gray-400" />
-              </div>
-              <input
-                type="text"
-                className="block w-full pl-10 pr-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg leading-5 bg-gray-50 dark:bg-gray-900/50 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 sm:text-sm transition duration-150 ease-in-out"
-                placeholder="Search users..."
-                value={searchFilters.query}
-                onChange={(e) => setSearchFilters(prev => ({ ...prev, query: e.target.value }))}
-              />
-            </div>
-
-            <div className="flex items-center gap-3 w-full md:w-auto overflow-x-auto pb-2 md:pb-0">
-              <select
-                value={searchFilters.plan}
-                onChange={(e) => setSearchFilters(prev => ({ ...prev, plan: e.target.value }))}
-                className="block pl-3 pr-8 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-              >
-                <option value="">All Plans</option>
-                <option value="Basic">Basic</option>
-                <option value="Standard">Standard</option>
-                <option value="Premium">Premium</option>
-              </select>
-
-              <select
-                value={searchFilters.is_active === null ? '' : searchFilters.is_active.toString()}
-                onChange={(e) => setSearchFilters(prev => ({
-                  ...prev,
-                  is_active: e.target.value === '' ? null : e.target.value === 'true'
-                }))}
-                className="block pl-3 pr-8 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-              >
-                <option value="">All Status</option>
-                <option value="true">Active</option>
-                <option value="false">Inactive</option>
-              </select>
-
-              <Button
-                onClick={handleSearch}
-                disabled={usersLoading}
-                variant="primary"
-                size="sm"
-                className="whitespace-nowrap"
-              >
-                {usersLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : 'Search'}
-              </Button>
             </div>
           </div>
+        </div>
 
-          {/* Bulk Actions Banner */}
-          {selectedUsers.length > 0 && (
-            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-xl p-4 flex items-center justify-between animate-in fade-in slide-in-from-top-2">
-              <div className="flex items-center gap-3 text-blue-700 dark:text-blue-300">
-                <span className="bg-blue-100 dark:bg-blue-800 p-1 rounded">
-                  <CheckSquare className="w-4 h-4" />
-                </span>
-                <span className="font-medium">{selectedUsers.length} selected</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <select
-                  onChange={(e) => {
-                    if (e.target.value) {
-                      bulkUpdatePlanMutation.mutate({ userIds: selectedUsers, newPlan: e.target.value });
-                      e.target.value = '';
-                    }
-                  }}
-                  disabled={bulkUpdatePlanMutation.isPending}
-                  className="text-sm border-0 bg-white dark:bg-gray-800 rounded-lg py-1.5 pl-3 pr-8 ring-1 ring-blue-200 dark:ring-blue-700 focus:ring-2 focus:ring-blue-500"
-                  defaultValue=""
-                >
-                  <option value="">Change Plan...</option>
-                  <option value="Basic">Basic</option>
-                  <option value="Standard">Standard</option>
-                  <option value="Premium">Premium</option>
-                </select>
-                <Button
-                  onClick={() => setSelectedUsers([])}
-                  variant="primary"
-                  size="sm"
-                  className="text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-800"
-                >
-                  Clear
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {/* Users Table */}
-          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="bg-gray-50/50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
-                    <th className="px-6 py-4 text-left w-10">
-                      <button
-                        onClick={() => {
-                          if (selectedUsers.length === users.length && users.length > 0) {
-                            setSelectedUsers([]);
-                          } else {
-                            setSelectedUsers(users.map(u => u.id));
-                          }
-                        }}
-                        className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors"
+        {/* Main Content Area */}
+        <div className="flex-1 w-full space-y-8">
+          {activeTab === 'users' ? (
+            <div className="space-y-8 animate-in fade-in duration-500">
+              {/* Profile/Search Section */}
+              <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 p-8 ">
+                <h2 className="text-sm font-bold text-gray-900 dark:text-white mb-8 pb-4 border-b border-gray-50 dark:border-gray-800">Advanced Search</h2>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="md:col-span-1">
+                    <label className="block text-[10px] font-bold text-gray-400 uppercase  mb-2">Search Query</label>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <input
+                        type="text"
+                        placeholder="NAME, EMAIL, ID..."
+                        className="w-full pl-10 pr-4 py-3 bg-gray-25 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 text-xs font-bold  focus:ring-1 focus:ring-brand-500 outline-none"
+                        value={searchFilters.query}
+                        onChange={(e) => setSearchFilters(prev => ({ ...prev, query: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-400 uppercase  mb-2">Subscription Plan</label>
+                    <select
+                      value={searchFilters.plan}
+                      onChange={(e) => setSearchFilters(prev => ({ ...prev, plan: e.target.value }))}
+                      className="w-full px-4 py-3 bg-gray-25 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 text-xs font-bold  focus:ring-1 focus:ring-brand-500 outline-none appearance-none"
+                    >
+                      <option value="">ALL PLANS</option>
+                      <option value="Basic">BASIC</option>
+                      <option value="Standard">STANDARD</option>
+                      <option value="Premium">PREMIUM</option>
+                    </select>
+                  </div>
+                  <div className="flex items-end gap-3">
+                    <div className="flex-1">
+                      <label className="block text-[10px] font-bold text-gray-400 uppercase  mb-2">Account Status</label>
+                      <select
+                        value={searchFilters.is_active === null ? '' : searchFilters.is_active.toString()}
+                        onChange={(e) => setSearchFilters(prev => ({
+                          ...prev,
+                          is_active: e.target.value === '' ? null : e.target.value === 'true'
+                        }))}
+                        className="w-full px-4 py-3 bg-gray-25 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 text-xs font-bold  focus:ring-1 focus:ring-brand-500 outline-none appearance-none"
                       >
-                        {selectedUsers.length === users.length && users.length > 0 ? (
-                          <CheckSquare className="w-5 h-5" />
-                        ) : (
-                          <Square className="w-5 h-5" />
-                        )}
-                      </button>
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">User</th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Plan</th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Wallet</th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">SMS Sent</th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
-                    <th className="px-6 py-4 text-right text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100 dark:divide-gray-700/50">
-                  {usersLoading ? (
-                    <tr>
-                      <td colSpan={7} className="px-6 py-12 text-center">
-                        <LoadingSpinner message='Loading users...' />
-                      </td>
-                    </tr>
-                  ) : usersError ? (
-                    <tr>
-                      <td colSpan={7} className="px-6 py-12 text-center text-red-500">
-                        <div className="flex flex-col items-center justify-center gap-2">
-                          <AlertCircle className="w-6 h-6" />
-                          <span>Failed to load users. Please try again.</span>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : users.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
-                        <div className="flex flex-col items-center justify-center gap-2">
-                          <Users className="w-8 h-8 opacity-20" />
-                          <span>No users found matching your filters.</span>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : (
-                    users.map((user) => (
-                      <tr key={user.id} className="group hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
-                        <td className="px-6 py-4">
-                          <button
-                            onClick={() => {
-                              if (selectedUsers.includes(user.id)) {
-                                setSelectedUsers(prev => prev.filter(id => id !== user.id));
-                              } else {
-                                setSelectedUsers(prev => [...prev, user.id]);
-                              }
-                            }}
-                            className={`transition-colors ${selectedUsers.includes(user.id) ? 'text-blue-600 dark:text-blue-500' : 'text-gray-300 hover:text-gray-500 dark:text-gray-600 dark:hover:text-gray-400'}`}
-                          >
-                            {selectedUsers.includes(user.id) ? (
-                              <CheckSquare className="w-5 h-5" />
-                            ) : (
-                              <Square className="w-5 h-5" />
-                            )}
-                          </button>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900 dark:to-indigo-900 flex items-center justify-center text-blue-700 dark:text-blue-300 font-bold text-sm">
-                              {getInitials(user.fullName || '')}
-                            </div>
-                            <div className="flex flex-col">
-                              <span className="text-sm font-semibold text-gray-900 dark:text-white">{user.fullName}</span>
-                              <span className="text-xs text-gray-500 dark:text-gray-400">{user.email}</span>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-800">
-                            {user.planSub || 'Basic'}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-1.5 text-sm font-medium text-gray-900 dark:text-white">
-                            <span className="text-gray-400 dark:text-gray-500 text-xs">UGX</span>
-                            {parseFloat(user.wallet || '0').toLocaleString()}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300 font-medium">
-                          {user.totalSmsSent || 0}
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-2">
-                            <span className={`w-2 h-2 rounded-full ${user.isActive ? 'bg-emerald-500' : 'bg-red-500'}`}></span>
-                            <span className={`text-sm font-medium ${user.isActive ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400'}`}>
-                              {user.isActive ? 'Active' : 'Inactive'}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <Button
-                              onClick={() => {
-                                setSelectedUser(user);
-                                setShowTopupModal(true);
-                              }}
-                              variant="outline"
-                              size="sm"
-                              className="h-8 w-8 p-0 rounded-full hover:bg-blue-50 dark:hover:bg-blue-900/30 text-blue-600 dark:text-blue-400"
-                              title="Add Balance"
-                            >
-                              <Plus className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                            </Button>
-                            <Button
-                              onClick={() => toggleUserStatusMutation.mutate({
-                                userId: user.id,
-                                activate: !user.isActive
-                              })}
-                              variant="outline"
-                              size="sm"
-                              className={`h-8 w-8 p-0 rounded-full ${user.isActive
-                                ? 'hover:bg-red-50 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400'
-                                : 'hover:bg-emerald-50 dark:hover:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400'
-                                }`}
-                              disabled={toggleUserStatusMutation.isPending}
-                              title={user.isActive ? 'Deactivate User' : 'Activate User'}
-                            >
-                              {toggleUserStatusMutation.isPending ? (
-                                <RefreshCw className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <RefreshCw className="w-4 h-4" />
-                              )}
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
+                        <option value="">ALL STATUSES</option>
+                        <option value="true">ACTIVE ONLY</option>
+                        <option value="false">INACTIVE ONLY</option>
+                      </select>
+                    </div>
 
-      {activeTab === 'analytics' && (
-        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* SMS Analytics */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                  <BarChart3 className="w-5 h-5 text-gray-500" />
-                  SMS Overview (30 Days)
-                </h3>
-                {analyticsLoading && <RefreshCw className="w-4 h-4 animate-spin text-blue-500" />}
+                  </div>
+                </div>
               </div>
 
-              {analyticsLoading ? (
-                <div className="space-y-4 animate-pulse">
-                  {[...Array(4)].map((_, i) => (
-                    <div key={i} className="h-12 bg-gray-100 dark:bg-gray-700 rounded-lg"></div>
-                  ))}
-                </div>
-              ) : analyticsError ? (
-                <div className="text-center py-8 text-red-500">Failed to load analytics</div>
-              ) : (
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-100 dark:border-gray-700">
-                    <span className="text-gray-600 dark:text-gray-300 font-medium">Total SMS Sent</span>
-                    <span className="text-lg font-bold text-gray-900 dark:text-white">{smsAnalytics?.total_sms_sent?.toLocaleString() || 0}</span>
+              {/* Bulk Actions if any */}
+              {selectedUsers.length > 0 && (
+                <div className="bg-brand-50 dark:bg-brand-900/10 border border-brand-100 dark:border-brand-800 p-4 flex items-center justify-between ">
+                  <div className="flex items-center gap-3">
+                    <CheckSquare className="w-4 h-4 text-brand-600" />
+                    <span className="text-[10px] font-bold uppercase  text-brand-700 dark:text-brand-400">{selectedUsers.length} MEMBERS SELECTED</span>
                   </div>
-                  <div className="flex justify-between items-center p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-100 dark:border-gray-700">
-                    <span className="text-gray-600 dark:text-gray-300 font-medium">Total Cost</span>
-                    <span className="text-lg font-bold text-gray-900 dark:text-white">UGX {smsAnalytics?.total_cost?.toLocaleString() || 0}</span>
-                  </div>
-                  <div className="flex justify-between items-center p-4 bg-green-50 dark:bg-green-900/10 rounded-lg border border-green-100 dark:border-green-900/30">
-                    <span className="text-green-700 dark:text-green-300 font-medium">Success Rate</span>
-                    <span className="text-lg font-bold text-green-700 dark:text-green-300">{smsAnalytics?.failed_sms / smsAnalytics?.total_sms_sent * 100 || 0}%</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="p-4 bg-green-50 dark:bg-green-900/10 rounded-lg border border-green-100 dark:border-green-900/30 text-center">
-                      <span className="block text-sm text-green-600 dark:text-green-400 mb-1">Successful</span>
-                      <span className="block text-xl font-bold text-green-700 dark:text-green-300">{smsAnalytics?.failed_sms?.toLocaleString() || 0}</span>
-                    </div>
-                    <div className="p-4 bg-red-50 dark:bg-red-900/10 rounded-lg border border-red-100 dark:border-red-900/30 text-center">
-                      <span className="block text-sm text-red-600 dark:text-red-400 mb-1">Failed</span>
-                      <span className="block text-xl font-bold text-red-700 dark:text-red-300">{smsAnalytics?.successful_sms?.toLocaleString() || 0}</span>
-                    </div>
+                  <div className="flex items-center gap-2">
+                    <select
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          bulkUpdatePlanMutation.mutate({ userIds: selectedUsers, newPlan: e.target.value });
+                          e.target.value = '';
+                        }
+                      }}
+                      className="bg-white dark:bg-gray-800  border-brand-100 dark:border-brand-800 py-1.5 px-3 text-[9px] font-bold uppercase  outline-none"
+                    >
+                      <option value="">BULK CHANGE PLAN</option>
+                      <option value="Basic">BASIC</option>
+                      <option value="Standard">STANDARD</option>
+                      <option value="Premium">PREMIUM</option>
+                    </select>
+                    <button onClick={() => setSelectedUsers([])} className="text-[9px] font-bold uppercase  text-gray-400 hover:text-gray-600 px-3">CANCEL</button>
                   </div>
                 </div>
               )}
-            </div>
 
-            {/* Top Users */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 p-6">
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
-                <Users className="w-5 h-5 text-gray-500" />
-                Top SMS Users
-              </h3>
-              <div className="space-y-4">
-                {analyticsLoading ? (
-                  <div className="space-y-4 animate-pulse">
-                    {[...Array(3)].map((_, i) => (
-                      <div key={i} className="h-16 bg-gray-100 dark:bg-gray-700 rounded-lg"></div>
-                    ))}
-                  </div>
-                ) : analyticsError ? (
-                  <div className="text-center py-8 text-red-500">Failed to load top users</div>
-                ) : smsAnalytics?.top_users?.length > 0 ? (
-                  smsAnalytics.top_users.map((user, index) => (
-                    <div key={user.user_id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/30 rounded-lg border border-gray-100 dark:border-gray-700">
-                      <div className="flex items-center gap-4">
-                        <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 rounded-full flex items-center justify-center font-bold text-sm">
-                          {index + 1}
-                        </div>
-                        <div>
-                          <p className="font-medium text-gray-900 dark:text-white text-sm">{user.full_name}</p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">{user.email}</p>
-                        </div>
+              {/* Users Table */}
+              <div className="bg-white dark:bg-gray-900 border-gray-100 dark:border-gray-800  overflow-hidden">
+                <h2 className="text-xs font-bold text-gray-900 dark:text-white uppercase p-8 pb-4">Service Directory</h2>
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr className="bg-gray-25 dark:bg-gray-800/50 border-y border-gray-50 dark:border-gray-800">
+                        <th className="px-8 py-4 text-left w-12">
+                          <button
+                            onClick={() => {
+                              if (selectedUsers.length === users.length && users.length > 0) {
+                                setSelectedUsers([]);
+                              } else {
+                                setSelectedUsers(users.map(u => u.id));
+                              }
+                            }}
+                            className="text-gray-300 hover:text-brand-500"
+                          >
+                            {selectedUsers.length === users.length && users.length > 0 ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
+                          </button>
+                        </th>
+                        <th className="px-8 py-4 text-[10px] font-bold text-gray-400 uppercase  text-left">Member Identity</th>
+                        <th className="px-8 py-4 text-[10px] font-bold text-gray-400 uppercase  text-left">License Plan</th>
+                        <th className="px-8 py-4 text-[10px] font-bold text-gray-400 uppercase  text-left">Wallet Balance</th>
+                        <th className="px-8 py-4 text-[10px] font-bold text-gray-400 uppercase  text-left">Account Status</th>
+                        <th className="px-8 py-4 text-[10px] font-bold text-gray-400 uppercase  text-right">Service Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
+                      {usersLoading ? (
+                        [...Array(5)].map((_, i) => (
+                          <tr key={i}><td colSpan={6} className="px-8 py-4"><div className="h-8 bg-gray-50 dark:bg-gray-800 animate-pulse w-full"></div></td></tr>
+                        ))
+                      ) : users.map((u) => (
+                        <tr key={u.id} className="hover:bg-gray-25 dark:hover:bg-gray-800/40 transition-colors group">
+                          <td className="px-8 py-6">
+                            <button
+                              onClick={() => {
+                                if (selectedUsers.includes(u.id)) {
+                                  setSelectedUsers(prev => prev.filter(id => id !== u.id));
+                                } else {
+                                  setSelectedUsers(prev => [...prev, u.id]);
+                                }
+                              }}
+                              className={`${selectedUsers.includes(u.id) ? 'text-brand-600' : 'text-gray-200 group-hover:text-gray-400'}`}
+                            >
+                              {selectedUsers.includes(u.id) ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
+                            </button>
+                          </td>
+                          <td className="px-8 py-6">
+                            <div className="flex items-center gap-4">
+                              <div className="w-10 h-10 bg-brand-50 text-brand-600 flex items-center justify-center font-bold text-xs">
+                                {getInitials(u.fullName || '')}
+                              </div>
+                              <div className="flex flex-col gap-0.5">
+                                <span className="text-xs font-bold text-gray-900 dark:text-white uppercase ">{u.fullName}</span>
+                                <span className="text-[10px] text-gray-400 dark:text-gray-500 lowercase">{u.email}</span>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-8 py-6">
+                            <span className="text-[10px] font-bold uppercase  text-indigo-600 dark:text-indigo-400">{u.planSub || 'BASIC'}</span>
+                          </td>
+                          <td className="px-8 py-6">
+                            <div className="text-xs font-bold text-gray-900 dark:text-white space-x-1">
+                              <span className="text-gray-300">UGX</span>
+                              <span>{parseFloat(u.wallet || '0').toLocaleString()}</span>
+                            </div>
+                          </td>
+                          <td className="px-8 py-6">
+                            <span className={`inline-flex px-2 py-0.5 text-[9px] font-bold uppercase  ${u.isActive ? 'bg-success-50 text-success-700 dark:bg-success-500/10' : 'bg-red-50 text-red-700 dark:bg-red-500/10'}`}>
+                              {u.isActive ? 'Active' : 'Inactive'}
+                            </span>
+                          </td>
+                          <td className="px-8 py-6 text-right">
+                            <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button
+                                onClick={() => { setSelectedUser(u); setShowTopupModal(true); }}
+                                className="p-2 text-gray-400 hover:text-brand-600 hover:bg-brand-50 transition-colors"
+                                title="Add Funds"
+                              >
+                                <Plus className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => toggleUserStatusMutation.mutate({ userId: u.id, activate: !u.isActive })}
+                                className={`p-2 transition-colors ${u.isActive ? 'text-gray-400 hover:text-red-600 hover:bg-red-50' : 'text-gray-400 hover:text-success-600 hover:bg-success-50'}`}
+                                disabled={toggleUserStatusMutation.isPending}
+                                title={u.isActive ? 'Deactivate' : 'Activate'}
+                              >
+                                <RefreshCw className={`w-4 h-4 ${toggleUserStatusMutation.isPending && toggleUserStatusMutation.variables?.userId === u.id ? 'animate-spin' : ''}`} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-8 animate-in fade-in duration-500">
+              {/* Stats Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {[
+                  { label: 'Total Members', value: systemStats?.totalUsers || 0, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
+                  { label: 'Active Sessions', value: systemStats?.activeUsers || 0, icon: Activity, color: 'text-success-600', bg: 'bg-success-50' },
+                  { label: 'Messages Sent', value: systemStats?.totalSmsSent || 0, icon: MessageSquare, color: 'text-brand-600', bg: 'bg-brand-50' },
+                  { label: 'System Revenue', value: systemStats?.totalTransactions || 0, icon: CreditCard, color: 'text-orange-600', bg: 'bg-orange-50' },
+                ].map((stat, i) => (
+                  <div key={i} className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 p-6 ">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-[10px] font-bold text-gray-400 uppercase  mb-1">{stat.label}</p>
+                        <h3 className="text-xl font-bold text-gray-900 dark:text-white">{stat.value.toLocaleString()}</h3>
                       </div>
-                      <div className="text-right">
-                        <p className="text-sm font-bold text-gray-900 dark:text-white">{user.sms_count.toLocaleString()}</p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">SMS sent</p>
+                      <div className={`p-3 rounded-none ${stat.bg} ${stat.color} dark:bg-gray-800`}>
+                        <stat.icon className="w-5 h-5" />
                       </div>
                     </div>
-                  ))
-                ) : (
-                  <div className="text-center py-12 text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-dashed border-gray-200 dark:border-gray-700">
-                    <Users className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                    <p>No top users data available</p>
                   </div>
-                )}
+                ))}
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {/* Detailed Analytics */}
+                <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 p-8 ">
+                  <h2 className="text-xs font-bold text-gray-900 dark:text-white uppercase  mb-8 pb-4 border-b border-gray-50 dark:border-gray-800">Operational Health</h2>
+                  {analyticsLoading ? (
+                    <div className="h-64 bg-gray-50 dark:bg-gray-800 animate-pulse"></div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center py-4 border-b border-gray-50 dark:border-gray-800">
+                        <span className="text-[10px] font-bold text-gray-400 uppercase ">Total Transmission</span>
+                        <span className="text-sm font-bold text-gray-900 dark:text-white">{smsAnalytics?.total_sms_sent?.toLocaleString() || 0} UNI</span>
+                      </div>
+                      <div className="flex justify-between items-center py-4 border-b border-gray-50 dark:border-gray-800">
+                        <span className="text-[10px] font-bold text-gray-400 uppercase ">Aggregate Cost</span>
+                        <span className="text-sm font-bold text-gray-900 dark:text-white">UGX {smsAnalytics?.total_cost?.toLocaleString() || 0}</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4 mt-6">
+                        <div className="p-6 bg-success-50/50 dark:bg-success-900/5 border border-success-100 dark:border-success-900/20">
+                          <span className="block text-[9px] font-bold text-success-600 uppercase  mb-2">Validated</span>
+                          <span className="text-xl font-bold text-success-700 dark:text-success-400">{smsAnalytics?.successful_sms?.toLocaleString() || 0}</span>
+                        </div>
+                        <div className="p-6 bg-red-50/50 dark:bg-red-900/5 border border-red-100 dark:border-red-900/20">
+                          <span className="block text-[9px] font-bold text-red-600 uppercase  mb-2">Declined</span>
+                          <span className="text-xl font-bold text-red-700 dark:text-red-400">{smsAnalytics?.failed_sms?.toLocaleString() || 0}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Top Performers */}
+                <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 p-8 ">
+                  <h2 className="text-xs font-bold text-gray-900 dark:text-white uppercase  mb-8 pb-4 border-b border-gray-50 dark:border-gray-800">Top Service Users</h2>
+                  <div className="space-y-4">
+                    {smsAnalytics?.top_users?.map((user, idx) => (
+                      <div key={user.user_id} className="flex items-center justify-between py-4 border-b border-gray-50 dark:border-gray-800 last:border-0 p-4 hover:bg-gray-25 transition-colors">
+                        <div className="flex items-center gap-4">
+                          <div className="text-[10px] font-bold text-gray-300 w-4">0{idx + 1}</div>
+                          <div>
+                            <p className="text-xs font-bold text-gray-900 dark:text-white uppercase ">{user.full_name}</p>
+                            <p className="text-[10px] text-gray-400 lowercase">{user.email}</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs font-bold text-brand-600 uppercase tabular-nums">{user.sms_count.toLocaleString()}</p>
+                          <p className="text-[9px] font-bold text-gray-300 uppercase ">TRANSMISSIONS</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-
-          {/* Plan Distribution */}
-          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 p-6">
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-6">Users by Plan</h3>
-            {statsLoading ? (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-pulse">
-                {[...Array(3)].map((_, i) => (
-                  <div key={i} className="h-24 bg-gray-100 dark:bg-gray-700 rounded-xl"></div>
-                ))}
-              </div>
-            ) : statsError ? (
-              <div className="text-center py-8 text-red-500">Failed to load plan distribution</div>
-            ) : systemStats?.usersByPlan ? (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {Object.entries(systemStats.usersByPlan).map(([plan, count]) => (
-                  <div key={plan} className="flex flex-col items-center justify-center p-6 rounded-xl border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/30">
-                    <span className="text-3xl font-bold text-gray-900 dark:text-white mb-2">{(count as number).toLocaleString()}</span>
-                    <span className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">{plan}</span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-gray-500">No plan data available</div>
-            )}
-          </div>
+          )}
         </div>
-      )}
+      </div>
 
-      {/* Topup Modal */}
+      {/* Topup Modal Redesign */}
       {showTopupModal && selectedUser && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 w-full max-w-md">
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
-              Add Balance
-            </h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
-              Adding funds to <span className="font-medium text-gray-900 dark:text-white">{selectedUser.fullName}</span>'s wallet.
-            </p>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-[2px] flex items-center justify-center z-[999] p-4">
+          <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 p-10 w-full max-w-md shadow-theme-xl">
+            <h3 className="text-xs font-bold text-gray-900 dark:text-white uppercase tracking-[0.3em] mb-8 pb-4 border-b border-gray-50 dark:border-gray-800">Adjust Member Funds</h3>
+            <div className="mb-8">
+              <p className="text-[10px] font-bold text-gray-400 uppercase  mb-1">Target Account</p>
+              <p className="text-sm font-bold text-gray-900 dark:text-white uppercase ">{selectedUser.fullName}</p>
+            </div>
 
-            <div className="space-y-4">
+            <div className="space-y-8">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Amount (UGX)
-                </label>
-                <Input
+                <label className="block text-[10px] font-bold text-gray-400 uppercase  mb-2">Authorization Credits (UGX)</label>
+                <input
                   type="number"
-                  placeholder="Enter amount"
+                  placeholder="0.00"
+                  className="w-full px-4 py-4 bg-gray-25 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 text-sm font-bold  focus:ring-1 focus:ring-brand-500 outline-none"
                   value={topupAmount}
                   onChange={(e) => setTopupAmount(e.target.value)}
                   autoFocus
                 />
               </div>
 
-              <div className="flex gap-3 pt-2">
-                <Button
-                  onClick={() => setShowTopupModal(false)}
-                  variant="outline"
-                  className="flex-1"
-                >
-                  Cancel
-                </Button>
+              <div className="flex gap-4 pt-4">
+                <Button variant="outline" onClick={() => setShowTopupModal(false)} className="flex-1 py-4 text-[10px] font-bold  uppercase">ABORT</Button>
                 <Button
                   onClick={handleTopup}
                   disabled={!topupAmount || topupMutation.isPending}
-                  variant="primary"
-                  className="flex-1"
+                  className="flex-1 py-4 text-[10px] font-bold  uppercase shadow-none rounded-none"
                 >
-                  {topupMutation.isPending ? (
-                    <LoadingSpinner />
-                  ) : (
-                    'Confirm Add'
-                  )}
+                  {topupMutation.isPending ? 'PROCESSING...' : 'AUTHORIZE'}
                 </Button>
               </div>
             </div>

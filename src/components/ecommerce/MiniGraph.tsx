@@ -123,7 +123,7 @@ export default function MiniGraph() {
     };
 
     return (
-        <div className="bg-white dark:bg-white/[0.03] border border-gray-100 dark:border-gray-800 rounded-3xl p-6 shadow-sm">
+        <div className="bg-white dark:bg-white/[0.03] p-6 shadow">
             <div className="flex items-center justify-between mb-6">
                 <div>
                     <h3 className="text-lg font-bold text-gray-900 dark:text-white tracking-tight">Weekly Transactions</h3>

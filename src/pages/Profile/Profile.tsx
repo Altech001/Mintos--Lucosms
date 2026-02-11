@@ -257,7 +257,7 @@ export default function ProfilePage() {
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
             {/* Personal Information Card */}
-            <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+            <div className="bg-white dark:bg-gray-800 overflow-hidden">
               <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                   <User className="w-5 h-5 text-blue-600 dark:text-blue-400" />
@@ -338,277 +338,277 @@ export default function ProfilePage() {
                         </p>
                       </div>
                     </div>
-                  
-                  <div className="flex items-start gap-4">
-                    <div className="flex-shrink-0 w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
-                      <Phone className="w-5 h-5 text-green-600 dark:text-green-400" />
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">
-                            Phone Number
-                          </p>
-                          <p className="text-base font-medium text-gray-900 dark:text-white">
-                            {user?.phone || "Not provided"}
-                          </p>
+
+                    <div className="flex items-start gap-4">
+                      <div className="flex-shrink-0 w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
+                        <Phone className="w-5 h-5 text-green-600 dark:text-green-400" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">
+                              Phone Number
+                            </p>
+                            <p className="text-base font-medium text-gray-900 dark:text-white">
+                              {user?.phone || "Not provided"}
+                            </p>
+                          </div>
+                          <Button
+                            onClick={() => {
+                              setPhoneNumber(user?.phone || "");
+                              setIsPhoneModalOpen(true);
+                              setError(null);
+                              setMessage(null);
+                            }}
+                            size="sm"
+                            variant="outline"
+                            className="h-8 text-xs"
+                          >
+                            {user?.phone ? "Change" : "Add"}
+                          </Button>
                         </div>
-                        <Button
-                          onClick={() => {
-                            setPhoneNumber(user?.phone || "");
-                            setIsPhoneModalOpen(true);
-                            setError(null);
-                            setMessage(null);
-                          }}
-                          size="sm"
-                          variant="outline"
-                          className="h-8 text-xs"
-                        >
-                          {user?.phone ? "Change" : "Add"}
-                        </Button>
                       </div>
                     </div>
                   </div>
-                </div>
                 )}
+              </div>
             </div>
-          </div>
 
-          {/* Account Details Card */}
-          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                <CreditCard className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                Account Details
-              </h2>
-            </div>
-            <div className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div className="flex items-start gap-4">
-                  <div className="flex-shrink-0 w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
-                    <CreditCard className="w-5 h-5 text-green-600 dark:text-green-400" />
+            {/* Account Details Card */}
+            <div className="bg-white dark:bg-gray-800 overflow-hidden">
+              <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                  <CreditCard className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                  Account Details
+                </h2>
+              </div>
+              <div className="p-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div className="flex items-start gap-4">
+                    <div className="flex-shrink-0 w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
+                      <CreditCard className="w-5 h-5 text-green-600 dark:text-green-400" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">
+                        Subscription Plan
+                      </p>
+                      <p className="text-base font-semibold text-gray-900 dark:text-white">
+                        {user?.planSub}
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex-1">
-                    <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">
-                      Subscription Plan
-                    </p>
-                    <p className="text-base font-semibold text-gray-900 dark:text-white">
-                      {user?.planSub}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-4">
-                  <div className="flex-shrink-0 w-10 h-10 bg-amber-100 dark:bg-amber-900/30 rounded-lg flex items-center justify-center">
-                    <MessageSquare className="w-5 h-5 text-amber-600 dark:text-amber-400" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">
-                      SMS Cost
-                    </p>
-                    <p className="text-base font-semibold text-gray-900 dark:text-white">
-                      UGx {user?.smsCost}
-                    </p>
+                  <div className="flex items-start gap-4">
+                    <div className="flex-shrink-0 w-10 h-10 bg-amber-100 dark:bg-amber-900/30 rounded-lg flex items-center justify-center">
+                      <MessageSquare className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">
+                        SMS Cost
+                      </p>
+                      <p className="text-base font-semibold text-gray-900 dark:text-white">
+                        UGx {user?.smsCost}
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Sidebar */}
-        <div className="space-y-6">
-          {/* Wallet Card */}
-          <div className="bg-gradient-to-br from-blue-500 to-blue-600 dark:from-blue-600 dark:to-blue-700 rounded-xl overflow-hidden border border-blue-600 dark:border-blue-500">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
-                  <Wallet className="w-6 h-6 text-white" />
-                </div>
-                <div className="text-xs font-medium text-blue-100 uppercase tracking-wider">
-                  Balance
-                </div>
-              </div>
-              <div>
-                <p className="text-sm text-blue-100 mb-1">Wallet Balance</p>
-                <p className="text-3xl font-bold text-white">
-                  UGx {formatWalletBalance(user?.wallet)}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Promo Status Card */}
-          {promoStatus && (
-            <div className={`rounded-xl overflow-hidden border ${promoStatus.has_special_rate
-              ? "bg-gradient-to-br from-green-500 to-green-600 dark:from-green-600 dark:to-green-700 border-green-600 dark:border-green-500"
-              : "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700"
-              }`}>
+          {/* Sidebar */}
+          <div className="space-y-6">
+            {/* Wallet Card */}
+            <div className="bg-gradient-to-br from-blue-500 to-blue-600 dark:from-blue-600 dark:to-blue-700 rounded-none overflow-hidden">
               <div className="p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${promoStatus.has_special_rate
-                    ? "bg-white/20"
-                    : "bg-pink-100 dark:bg-pink-900/30"
-                    }`}>
-                    <Gift className={`w-6 h-6 ${promoStatus.has_special_rate
-                      ? "text-white"
-                      : "text-pink-600 dark:text-pink-400"
-                      }`} />
+                  <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
+                    <Wallet className="w-6 h-6 text-white" />
                   </div>
-                  <div className={`text-xs font-medium uppercase tracking-wider ${promoStatus.has_special_rate
-                    ? "text-green-100"
-                    : "text-gray-500 dark:text-gray-400"
-                    }`}>
-                    {promoStatus.has_special_rate ? "Active" : "Status"}
+                  <div className="text-xs font-medium text-blue-100 uppercase tracking-wider">
+                    Balance
                   </div>
                 </div>
                 <div>
-                  <p className={`text-sm mb-1 ${promoStatus.has_special_rate
-                    ? "text-green-100"
-                    : "text-gray-600 dark:text-gray-400"
-                    }`}>
-                    Promo Status
+                  <p className="text-sm text-blue-100 mb-1">Wallet Balance</p>
+                  <p className="text-3xl font-bold text-white">
+                    UGx {formatWalletBalance(user?.wallet)}
                   </p>
-                  <p className={`text-base font-semibold ${promoStatus.has_special_rate
-                    ? "text-white"
-                    : "text-gray-900 dark:text-white"
-                    }`}>
-                    {promoStatus.message}
-                  </p>
-                  {promoStatus.has_special_rate && (
-                    <p className="text-xs text-green-100 mt-2">
-                      Current rate: UGx {promoStatus.current_sms_cost}
-                    </p>
-                  )}
                 </div>
               </div>
             </div>
-          )}
+
+            {/* Promo Status Card */}
+            {promoStatus && (
+              <div className={`rounded-none overflow-hidden ${promoStatus.has_special_rate
+                ? "bg-gradient-to-br from-green-500 to-green-600 dark:from-green-600 dark:to-green-700 border-green-600 dark:border-green-500"
+                : "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700"
+                }`}>
+                <div className="p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${promoStatus.has_special_rate
+                      ? "bg-white/20"
+                      : "bg-pink-100 dark:bg-pink-900/30"
+                      }`}>
+                      <Gift className={`w-6 h-6 ${promoStatus.has_special_rate
+                        ? "text-white"
+                        : "text-pink-600 dark:text-pink-400"
+                        }`} />
+                    </div>
+                    <div className={`text-xs font-medium uppercase tracking-wider ${promoStatus.has_special_rate
+                      ? "text-green-100"
+                      : "text-gray-500 dark:text-gray-400"
+                      }`}>
+                      {promoStatus.has_special_rate ? "Active" : "Status"}
+                    </div>
+                  </div>
+                  <div>
+                    <p className={`text-sm mb-1 ${promoStatus.has_special_rate
+                      ? "text-green-100"
+                      : "text-gray-600 dark:text-gray-400"
+                      }`}>
+                      Promo Status
+                    </p>
+                    <p className={`text-base font-semibold ${promoStatus.has_special_rate
+                      ? "text-white"
+                      : "text-gray-900 dark:text-white"
+                      }`}>
+                      {promoStatus.message}
+                    </p>
+                    {promoStatus.has_special_rate && (
+                      <p className="text-xs text-green-100 mt-2">
+                        Current rate: UGx {promoStatus.current_sms_cost}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
-    </div>
       </ComponentCard >
 
-    {/* Password Modal */ }
-    < Modal
-  isOpen = { isPasswordModalOpen }
-  onClose = {() => setIsPasswordModalOpen(false)
-}
-title = "Change Password"
-  >
+      {/* Password Modal */}
+      < Modal
+        isOpen={isPasswordModalOpen}
+        onClose={() => setIsPasswordModalOpen(false)
+        }
+        title="Change Password"
+      >
 
-  <div className="space-y-5">
-    
-    <div>
-      <Label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">
-        Current Password
-      </Label>
-      <Input
-        type="password"
-        value={currentPassword}
-        onChange={(e) => setCurrentPassword(e.target.value)}
-        placeholder="Enter current password"
-        className="w-full"
-      />
-    </div>
-    <span className="text-xs font-medium text-gray-700 dark:text-gray-500 mb-1.5 block">
-        8 charaters minimum, including uppercase, lowercase, number, and special character.
-      </span>
-    <div>
-      <Label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">
-        New Password
-      </Label>
-      
-      <Input
-        type="password"
-        value={newPassword}
-        onChange={(e) => setNewPassword(e.target.value)}
-        placeholder="Enter new password"
-        className="w-full"
-      />
-    </div>
-    <div>
-      <Label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">
-        Confirm New Password
-      </Label>
-      <Input
-        type="password"
-        value={confirmNewPassword}
-        onChange={(e) => setConfirmNewPassword(e.target.value)}
-        placeholder="Confirm new password"
-        className="w-full"
-      />
-    </div>
-    <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-      <Button
-        onClick={() => setIsPasswordModalOpen(false)}
-        variant="outline"
-      >
-        Cancel
-      </Button>
-      <Button
-        onClick={handlePasswordChange}
-        isLoading={isChangingPassword}
-      >
-        Update Password
-      </Button>
-    </div>
-  </div>
+        <div className="space-y-5">
+
+          <div>
+            <Label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">
+              Current Password
+            </Label>
+            <Input
+              type="password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              placeholder="Enter current password"
+              className="w-full"
+            />
+          </div>
+          <span className="text-xs font-medium text-gray-700 dark:text-gray-500 mb-1.5 block">
+            8 charaters minimum, including uppercase, lowercase, number, and special character.
+          </span>
+          <div>
+            <Label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">
+              New Password
+            </Label>
+
+            <Input
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              placeholder="Enter new password"
+              className="w-full"
+            />
+          </div>
+          <div>
+            <Label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">
+              Confirm New Password
+            </Label>
+            <Input
+              type="password"
+              value={confirmNewPassword}
+              onChange={(e) => setConfirmNewPassword(e.target.value)}
+              placeholder="Confirm new password"
+              className="w-full"
+            />
+          </div>
+          <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <Button
+              onClick={() => setIsPasswordModalOpen(false)}
+              variant="outline"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handlePasswordChange}
+              isLoading={isChangingPassword}
+            >
+              Update Password
+            </Button>
+          </div>
+        </div>
       </Modal >
 
-  {/* Phone Update Modal */ }
-  < Modal
-isOpen = { isPhoneModalOpen }
-onClose = {() => setIsPhoneModalOpen(false)}
-title = { user?.phone? "Change Phone Number": "Add Phone Number" }
-  >
-  <div className="space-y-5">
-    <div>
-      <Label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">
-        Phone Number
-      </Label>
-      <Input
-        type="tel"
-        value={phoneNumber}
-        onChange={(e) => {
-          setPhoneNumber(e.target.value.replace(/[^\d+]/g, ''));
-          setPhoneIdentityName('');
-        }}
-        placeholder="e.g. 256712345678"
-        className="w-full"
-      />
-      <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-        Format: countrycode + number (e.g., 2567xxxxxxx)
-      </p>
-      {phoneIdentityName && (
-        <p className="mt-2 text-sm text-green-600 dark:text-green-400 flex items-center gap-1">
-          <CheckCircle className="h-4 w-4" />
-          Account holder: {phoneIdentityName}
-        </p>
-      )}
-    </div>
+      {/* Phone Update Modal */}
+      < Modal
+        isOpen={isPhoneModalOpen}
+        onClose={() => setIsPhoneModalOpen(false)}
+        title={user?.phone ? "Change Phone Number" : "Add Phone Number"}
+      >
+        <div className="space-y-5">
+          <div>
+            <Label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">
+              Phone Number
+            </Label>
+            <Input
+              type="tel"
+              value={phoneNumber}
+              onChange={(e) => {
+                setPhoneNumber(e.target.value.replace(/[^\d+]/g, ''));
+                setPhoneIdentityName('');
+              }}
+              placeholder="e.g. 256712345678"
+              className="w-full"
+            />
+            <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+              Format: countrycode + number (e.g., 2567xxxxxxx)
+            </p>
+            {phoneIdentityName && (
+              <p className="mt-2 text-sm text-green-600 dark:text-green-400 flex items-center gap-1">
+                <CheckCircle className="h-4 w-4" />
+                Account holder: {phoneIdentityName}
+              </p>
+            )}
+          </div>
 
-    <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-      <Button
-        onClick={() => setIsPhoneModalOpen(false)}
-        variant="outline"
-      >
-        Cancel
-      </Button>
-      <Button
-        onClick={handlePhoneUpdate}
-        disabled={!phoneNumber || phoneNumber.replace(/\D/g, '').length < 9 || isValidatingPhone || isUpdatingPhone}
-        isLoading={isValidatingPhone || isUpdatingPhone}
-      >
-        {isValidatingPhone ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Validating...
-          </>
-        ) : (
-          'Save Number'
-        )}
-      </Button>
-    </div>
-  </div>
+          <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <Button
+              onClick={() => setIsPhoneModalOpen(false)}
+              variant="outline"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handlePhoneUpdate}
+              disabled={!phoneNumber || phoneNumber.replace(/\D/g, '').length < 9 || isValidatingPhone || isUpdatingPhone}
+              isLoading={isValidatingPhone || isUpdatingPhone}
+            >
+              {isValidatingPhone ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Validating...
+                </>
+              ) : (
+                'Save Number'
+              )}
+            </Button>
+          </div>
+        </div>
       </Modal >
     </div >
   );

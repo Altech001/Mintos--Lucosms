@@ -28,7 +28,7 @@ const UgandaMap: React.FC<UgandaMapProps> = ({
   }, []);
 
   return (
-    <div className="relative w-full h-full overflow-hidden rounded-xl bg-gray-50 dark:bg-gray-900/50">
+    <div className="relative w-full h-full overflow-hidden bg-gray-50 dark:bg-gray-900/50">
       <VectorMap
         map={africaMill}
         // containerClassName="w-full h-full"
@@ -126,7 +126,7 @@ const UgandaMap: React.FC<UgandaMapProps> = ({
       />
 
       {/* Uganda Flag Badge (Top Right) */}
-      <div className="absolute top-4 right-4 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-2 flex items-center gap-2 border border-gray-200 dark:border-gray-700">
+      <div className="absolute top-4 right-4 bg-white dark:bg-gray-800 rounded shadow-lg p-2 flex items-center gap-2 border-gray-200 dark:border-gray-700">
         <div className="w-8 h-6 rounded overflow-hidden shadow">
           <svg viewBox="0 0 640 480" className="w-full h-full">
             <rect width="640" height="480" fill="#D21034" />
@@ -140,7 +140,7 @@ const UgandaMap: React.FC<UgandaMapProps> = ({
       </div>
 
       {/* Legend (Bottom Left) */}
-      <div className="absolute bottom-4 left-4 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-lg p-3 text-xs font-medium text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700">
+      <div className="absolute bottom-4 left-4 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-lg p-3 text-xs font-medium text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700">
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
           <span>Uganda (Selected)</span>

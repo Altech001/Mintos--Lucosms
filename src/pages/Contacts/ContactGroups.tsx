@@ -294,7 +294,7 @@ export default function ContactGroups() {
       />
       <PageBreadcrumb pageTitle="Contact Groups" />
 
-      <div className="min-h-screen rounded-2xl border border-gray-200 bg-white px-5 py-7 dark:border-gray-800 dark:bg-white/3 xl:px-10 xl:py-12">
+      <div className="min-h-screen rounded-none bg-white px-5 py-7 dark:border-gray-800 dark:bg-white/3 xl:px-10 xl:py-12">
 
         {/* Header */}
         <div className="mb-6 flex items-center justify-between">
@@ -315,7 +315,7 @@ export default function ContactGroups() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 mb-8">
           {groupsQuery.isLoading && groups.length === 0 ? (
             Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-white/10 dark:bg-white/3">
+              <div key={i} className="rounded-none border border-gray-200 bg-white p-6 dark:border-white/10 dark:bg-white/3">
                 <Skeleton className="h-5 w-1/2 mb-3" />
                 <Skeleton className="h-4 w-1/3 mb-2" />
                 <Skeleton className="h-3 w-1/4" />
@@ -327,74 +327,74 @@ export default function ContactGroups() {
               </div>
             ))
           ) : (
-          paginatedGroups.map((group) => (
-            <div
-              key={group.id}
-              onClick={() => setSelectedGroup(group)}
-              className="group cursor-pointer rounded-2xl border border-gray-200 bg-white p-6 shadow-sm transition-all hover:shadow-md dark:border-white/10 dark:bg-white/3"
-            >
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white truncate">
-                  {group.name}
-                </h3>
-                <Users className="w-5 h-5 text-gray-500 dark:text-gray-400" />
-              </div>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
-                {group.contactsCount} contacts
-              </p>
-              <p className="text-xs text-gray-400 dark:text-gray-500">{group.createdAt}</p>
+            paginatedGroups.map((group) => (
+              <div
+                key={group.id}
+                onClick={() => setSelectedGroup(group)}
+                className="group cursor-pointer rounded-none border border-gray-200 bg-white p-6 shadow transition-all hover:shadow-md dark:border-white/10 dark:bg-white/3"
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white truncate">
+                    {group.name}
+                  </h3>
+                  <Users className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+                </div>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
+                  {group.contactsCount} contacts
+                </p>
+                <p className="text-xs text-gray-400 dark:text-gray-500">{group.createdAt}</p>
 
-              <div className="mt-4 flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setEditingGroup(group);
-                    setEditGroupName(group.name);
-                    setIsEditModalOpen(true);
-                  }}
-                  startIcon={<Edit2 className="w-4 h-4" />}
-                >
-                  Edit
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  isLoading={deletingGroupId === group.id && deleteGroupMutation.isPending}
-                  onClick={async (e) => {
-                    e.stopPropagation();
-                    if (confirm('Delete group?')) {
-                      try {
-                        setDeletingGroupId(group.id);
-                        await deleteGroupMutation.mutateAsync(group.id);
-                        setDeletingGroupId(null);
-                        // Clamp current page if needed will be handled by query refetch
-                      } catch (err) {
-                        setDeletingGroupId(null);
-                        console.error('Failed to delete group', err);
+                <div className="mt-4 flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setEditingGroup(group);
+                      setEditGroupName(group.name);
+                      setIsEditModalOpen(true);
+                    }}
+                    startIcon={<Edit2 className="w-4 h-4" />}
+                  >
+                    Edit
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    isLoading={deletingGroupId === group.id && deleteGroupMutation.isPending}
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      if (confirm('Delete group?')) {
+                        try {
+                          setDeletingGroupId(group.id);
+                          await deleteGroupMutation.mutateAsync(group.id);
+                          setDeletingGroupId(null);
+                          // Clamp current page if needed will be handled by query refetch
+                        } catch (err) {
+                          setDeletingGroupId(null);
+                          console.error('Failed to delete group', err);
+                        }
                       }
-                    }
-                  }}
-                  startIcon={<Trash2 className="w-4 h-4" />}
-                >
-                  Delete
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSelectedGroupForAdd(group);
-                    setIsAddModalOpen(true);
-                  }}
-                  startIcon={<UserPlus className="w-4 h-4" />}
-                >
-                  Add
-                </Button>
+                    }}
+                    startIcon={<Trash2 className="w-4 h-4" />}
+                  >
+                    Delete
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedGroupForAdd(group);
+                      setIsAddModalOpen(true);
+                    }}
+                    startIcon={<UserPlus className="w-4 h-4" />}
+                  >
+                    Add
+                  </Button>
+                </div>
               </div>
-            </div>
-          ))
+            ))
           )}
         </div>
 
@@ -428,7 +428,7 @@ export default function ContactGroups() {
         {/* Group Details Dialog */}
         {selectedGroup && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl max-w-4xl w-full max-h-[80vh] overflow-hidden flex flex-col">
+            <div className="bg-white dark:bg-gray-900 rounded-none shadow-xl max-w-4xl w-full max-h-[80vh] overflow-hidden flex flex-col">
               <div className="sticky top-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-white/10 p-6">
                 <div className="flex items-center justify-between">
                   <div>
@@ -436,8 +436,8 @@ export default function ContactGroups() {
                     <p className="text-sm text-gray-500 dark:text-gray-400">{selectedGroup.contactsCount} contacts</p>
                   </div>
                   <Button
-                    variant="outline"
-                    size="sm"
+                    variant="danger"
+                    className='rounded-none p-2'
                     onClick={() => setSelectedGroup(null)}
                     startIcon={<X className="w-5 h-5" />}
                   />
@@ -562,7 +562,7 @@ export default function ContactGroups() {
         {/* Create Group Modal */}
         {isCreateModalOpen && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl max-w-md w-full p-6">
+            <div className="bg-white dark:bg-gray-900 rounded-none shadow-xl max-w-md w-full p-6">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Create New Group</h3>
               <Label>Group Name</Label>
               <Input
@@ -596,7 +596,7 @@ export default function ContactGroups() {
         {/* Edit Group Modal */}
         {isEditModalOpen && editingGroup && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl max-w-md w-full p-6">
+            <div className="bg-white dark:bg-gray-900 rounded-none shadow-xl max-w-md w-full p-6">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Edit Group</h3>
               <Label>Group Name</Label>
               <Input
@@ -647,7 +647,7 @@ export default function ContactGroups() {
         {/* Edit Contact Modal */}
         {editingContact && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl max-w-md w-full p-6">
+            <div className="bg-white dark:bg-gray-900 rounded-none shadow-xl max-w-md w-full p-6">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Edit Contact</h3>
               <div className="space-y-4">
                 <div>
@@ -722,7 +722,7 @@ export default function ContactGroups() {
         {/* Add Contacts Modal – Creative Tabs */}
         {isAddModalOpen && selectedGroupForAdd && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl max-w-2xl w-full p-6">
+            <div className="bg-white dark:bg-gray-900 rounded-none shadow-xl max-w-2xl w-full p-6">
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                   Add to <span className="text-brand-600 dark:text-brand-400">{selectedGroupForAdd.name}</span>
@@ -739,21 +739,19 @@ export default function ContactGroups() {
               <div className="flex border-b border-gray-200 dark:border-white/10 mb-6">
                 <button
                   onClick={() => setActiveTab('single')}
-                  className={`px-4 py-2 text-sm font-medium transition-colors ${
-                    activeTab === 'single'
-                      ? 'text-brand-600 dark:text-brand-400 border-b-2 border-brand-600 dark:border-brand-400'
-                      : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-                  }`}
+                  className={`px-4 py-2 text-sm font-medium transition-colors ${activeTab === 'single'
+                    ? 'text-brand-600 dark:text-brand-400 border-b-2 border-brand-600 dark:border-brand-400'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                    }`}
                 >
                   Single Contact
                 </button>
                 <button
                   onClick={() => setActiveTab('excel')}
-                  className={`px-4 py-2 text-sm font-medium transition-colors ${
-                    activeTab === 'excel'
-                      ? 'text-brand-600 dark:text-brand-400 border-b-2 border-brand-600 dark:border-brand-400'
-                      : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-                  }`}
+                  className={`px-4 py-2 text-sm font-medium transition-colors ${activeTab === 'excel'
+                    ? 'text-brand-600 dark:text-brand-400 border-b-2 border-brand-600 dark:border-brand-400'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                    }`}
                 >
                   Excel Upload
                 </button>
@@ -804,11 +802,10 @@ export default function ContactGroups() {
                 <div className="space-y-4">
                   <div
                     {...getRootProps()}
-                    className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all ${
-                      isDragActive
-                        ? 'border-brand-500 bg-brand-50 dark:bg-brand-900/20'
-                        : 'border-gray-300 dark:border-gray-600 hover:border-brand-500'
-                    }`}
+                    className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all ${isDragActive
+                      ? 'border-brand-500 bg-brand-50 dark:bg-brand-900/20'
+                      : 'border-gray-300 dark:border-gray-600 hover:border-brand-500'
+                      }`}
                   >
                     <input {...getInputProps()} />
                     {uploadStatus === 'idle' && (

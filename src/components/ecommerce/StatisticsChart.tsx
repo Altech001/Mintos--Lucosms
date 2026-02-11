@@ -238,7 +238,7 @@ export default function StatisticsChart() {
       : "text-gray-500 dark:text-gray-400";
 
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white px-4 pb-4 pt-4 dark:border-gray-800 dark:bg-white/[0.03] sm:px-4 sm:pt-4">
+    <div className="shadow-xs bg-white px-4 pb-4 pt-4 dark:bg-white/[0.03] sm:px-4 sm:pt-4">
       <div className="flex flex-col gap-5 mb-4 sm:flex-row sm:justify-between">
         <div className="w-full">
           <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">

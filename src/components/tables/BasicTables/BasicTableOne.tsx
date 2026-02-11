@@ -162,18 +162,18 @@ export default function BasicTableOne({
         theme="colored"
       />
 
-      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-white/5 dark:bg-white/3">
+      <div className="overflow-hidden rounded-none  border-gray-200 bg-white dark:border-white/5 dark:bg-white/3">
         {/* Bulk Action Bar */}
         {selected.size > 0 && (
           <div className="flex items-center justify-between px-5 py-3 bg-brand-50 border-b border-brand-100 dark:bg-brand-900/20 dark:border-brand-800">
             <Badge size="sm">{selected.size} selected</Badge>
-            <button
+            <Button
               onClick={bulkDelete}
-              className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 dark:text-red-400 dark:bg-red-500/10 dark:hover:bg-red-500/20 transition-colors"
+              variant="danger"
             >
               <Trash2 className="w-4 h-4" />
               Delete Selected
-            </button>
+            </Button>
           </div>
         )}
 
@@ -243,13 +243,13 @@ export default function BasicTableOne({
                     </TableCell>
 
                     <TableCell className="px-5 py-4 text-start">
-                      <span className="font-medium text-gray-800 text-theme-sm dark:text-white/90">
+                      <span className="font-normal text-gray-800 text-sm dark:text-white/90">
                         {sms.recipient}
                       </span>
                     </TableCell>
 
                     <TableCell className="px-5 py-4 text-start max-w-xs">
-                      <p className="truncate text-gray-600 text-theme-sm dark:text-gray-300">
+                      <p className="truncate text-gray-600 text-theme-xs dark:text-gray-300">
                         {sms.message}
                       </p>
                     </TableCell>
@@ -341,7 +341,7 @@ export default function BasicTableOne({
 
             <div>
               <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Message</label>
-              <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-700/50">
+              <div className="p-4 bg-gray-50 dark:bg-gray-800/50">
                 <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap leading-relaxed">
                   {viewedSms.message}
                 </p>
