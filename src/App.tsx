@@ -12,6 +12,7 @@ import BatchUploader from "./pages/Admin/BatchUploader";
 import SeriesEditor from "./pages/Admin/Series/SeriesEditor";
 import SeriesEditScreen from "./pages/Admin/Series/SeriesEditScreen";
 import SeriesBatchUploader from "./pages/Admin/Series/SeriesBatchUploader";
+import SeriesFixer from "./pages/Admin/Series/SeriesFixer";
 import ForgotPasswordPage from "./pages/AuthPages/ForgotPassword";
 import ResetPasswordPage from "./pages/AuthPages/ResetPasswordPage";
 import SignIn from "./pages/AuthPages/SignIn";
@@ -88,6 +89,7 @@ export default function App() {
               <Route path="/admin/series/edit/:id" element={<SeriesEditScreen />} />
               <Route path="/admin/series/new" element={<SeriesEditScreen />} />
               <Route path="/admin/series/batch" element={<SeriesBatchUploader />} />
+              <Route path="/admin/series/fixer" element={<SeriesFixer />} />
             </Route>
           </Route>
 

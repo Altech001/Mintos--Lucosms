@@ -1,28 +1,27 @@
 import { ThemeToggleButton } from '@/components/common/ThemeToggleButton';
 import Input from '@/components/form/input/InputField';
-import {
-    Play,
-    Search,
-    ChevronRight,
-    Home,
-    Download,
-    ArrowLeft,
-    PlusCircle,
-    User,
-    X,
-    Loader2,
-    SkipForward
-} from 'lucide-react';
-import Modal from '@/components/ui/modal/Modal';
-import React, { useState, useEffect, useRef } from 'react';
-import Artplayer from 'artplayer';
 import Button from '@/components/ui/button/Button';
+import Modal from '@/components/ui/modal/Modal';
 import { useMovies } from '@/context/MovieContext';
-import { MovieResponse } from '@/context/movies_api';
+import { MovieResponse, UltimateSearchResult } from '@/context/movies_api';
 import { useToast } from '@/context/ToastContext';
+import Artplayer from 'artplayer';
+import {
+    ArrowLeft,
+    ChevronRight,
+    Download,
+    Home,
+    Loader2,
+    Play,
+    PlusCircle,
+    Search,
+    User,
+    X
+} from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router';
 import AdsLeft from './AdsLeft';
 import DonationDialog from './DonationDialog';
-import { useNavigate } from 'react-router';
 
 const ArtPlayerComponent: React.FC<{ url: string; poster: string }> = ({ url, poster }) => {
     const artRef = useRef<HTMLDivElement>(null);
@@ -94,7 +93,9 @@ const Movies: React.FC = () => {
         searchTerm,
         setSearchTerm,
         searchResults,
+        suggestions,
         isSearching,
+        isSuggesting,
         isSearchMode,
         refreshMovies,
         error
@@ -102,6 +103,7 @@ const Movies: React.FC = () => {
     const { showInfoToast, showSuccessToast, showErrorToast } = useToast();
     const [selectedGenre] = useState('All');
     const [selectedMovie, setSelectedMovie] = useState<MovieResponse | null>(null);
+    const [showSuggestions, setShowSuggestions] = useState(false);
     const observerTarget = useRef<HTMLDivElement>(null);
     const scrollPositionRef = useRef<number>(0);
     const navigate = useNavigate();
@@ -151,12 +153,33 @@ const Movies: React.FC = () => {
         };
     }, [hasNextPage, isFetchingNextPage, fetchNextPage, selectedMovie, error]);
 
-    // When in search mode, use server-wide search results; otherwise use paginated movies
-    const displayMovies = isSearchMode ? searchResults : movies;
-    const filteredMovies = displayMovies.filter(movie => {
-        const matchesGenre = selectedGenre === 'All' || movie.genre?.includes(selectedGenre);
-        return matchesGenre;
-    });
+    // When in search mode, use server-wide ultimate search results
+    const filteredResults: UltimateSearchResult[] = isSearchMode
+        ? searchResults.filter(res => selectedGenre === 'All' || res.item.genre?.includes(selectedGenre))
+        : movies
+            .filter(movie => selectedGenre === 'All' || movie.genre?.includes(selectedGenre))
+            .map(movie => ({ type: 'movie' as const, score: 100, item: movie }));
+
+    useEffect(() => {
+        const handleClickOutside = () => setShowSuggestions(false);
+        if (showSuggestions) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [showSuggestions]);
+
+    const handleResultClick = (res: UltimateSearchResult) => {
+
+        // If it's from Ultimate Searcher results
+        if (res.type === 'movie') {
+            setSelectedMovie(res.item as MovieResponse);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        } else {
+            // It's a series
+            navigate('/series'); // Simple navigation for now, or update Series page to handle ID
+            showInfoToast(`Switching to Series: ${res.item.name}`);
+        }
+    };
 
     const handleMovieClick = (movie: MovieResponse) => {
         // Save current scroll position before navigating to detail
@@ -279,11 +302,54 @@ const Movies: React.FC = () => {
                                 )}
                                 <Input
                                     type="text"
-                                    placeholder="Search movies..."
+                                    placeholder="Search movies & series..."
                                     className="pl-10 pr-10 py-2 bg-gray-900/50 rounded-none focus:outline-none focus:ring-1 shadow-none focus:ring-brand-500 text-sm transition-all w-full sm:w-80 lg:w-84 focus:sm:w-96"
                                     value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    onChange={(e) => {
+                                        setSearchTerm(e.target.value);
+                                        setShowSuggestions(true);
+                                    }}
+                                    onFocus={() => setShowSuggestions(true)}
                                 />
+                                {/* Suggestions Dropdown */}
+                                {showSuggestions && searchTerm.length >= 2 && (suggestions.length > 0 || isSuggesting) && (
+                                    <div className="absolute top-full left-0 right-0 mt-2 bg-white/95 dark:bg-gray-800/95 backdrop-blur-xl border border-gray-200 dark:border-gray-700 shadow-2xl z-[100] max-h-80 overflow-y-auto no-scrollbar rounded-none animate-in fade-in slide-in-from-top-2 duration-200">
+                                        {isSuggesting && suggestions.length === 0 && (
+                                            <div className="p-4 text-xs text-gray-500 flex items-center gap-3">
+                                                <Loader2 size={14} className="animate-spin text-brand-500" />
+                                                <span className="animate-pulse">Analyzing catalog...</span>
+                                            </div>
+                                        )}
+                                        {suggestions.map((suggestion, idx) => (
+                                            <div
+                                                key={idx}
+                                                className="px-5 py-3 hover:bg-brand-500/5 dark:hover:bg-brand-500/10 cursor-pointer transition-all border-b border-gray-100/50 dark:border-gray-700/50 last:border-0 group/suggest"
+                                                onClick={() => {
+                                                    setSearchTerm(suggestion.name);
+                                                    setShowSuggestions(false);
+                                                }}
+                                            >
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-3">
+                                                        <Search size={12} className="text-gray-400 group-hover/suggest:text-brand-500 transition-colors" />
+                                                        <span className="text-sm font-medium text-gray-900 dark:text-gray-100 group-hover/suggest:text-brand-500 transition-colors">
+                                                            {suggestion.name}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-[9px] font-black text-brand-500/60 uppercase tracking-tighter">Match</span>
+                                                        <div className="w-12 h-1 bg-gray-100 dark:bg-gray-900 rounded-full overflow-hidden">
+                                                            <div
+                                                                className="h-full bg-brand-500 transition-all duration-500"
+                                                                style={{ width: `${Math.min(100, suggestion.score)}%` }}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                                 {searchTerm && (
                                     <button
                                         onClick={() => setSearchTerm('')}
@@ -378,13 +444,13 @@ const Movies: React.FC = () => {
                                         </h2>
                                         {isSearchMode && !isSearching && (
                                             <span className="text-xs font-bold text-brand-500 bg-brand-500/10 px-2 py-0.5 rounded-sm">
-                                                {filteredMovies.length} found across {movieCount.toLocaleString()} movies
+                                                {filteredResults.length} found
                                             </span>
                                         )}
                                         {isSearching && (
                                             <span className="text-xs font-medium text-gray-500 flex items-center gap-1">
                                                 <Loader2 size={12} className="animate-spin" />
-                                                Searching all {movieCount.toLocaleString()} movies...
+                                                Searching movies & series...
                                             </span>
                                         )}
                                     </div>
@@ -395,46 +461,64 @@ const Movies: React.FC = () => {
                                         [...Array(14)].map((_, i) => <MovieSkeleton key={i} />)
                                     ) : (
                                         <>
-                                            {filteredMovies.map((movie) => (
-                                                <div
-                                                    key={movie.id}
-                                                    className="group flex flex-col gap-2 cursor-pointer"
-                                                    onClick={() => handleMovieClick(movie)}
-                                                >
-                                                    {/* Image Container - Poster Focus */}
-                                                    <div className="relative aspect-[10/14] rounded-none overflow-hidden bg-gray-900 ">
-                                                        <img
-                                                            src={movie.poster_url}
-                                                            alt={movie.name}
-                                                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                                                        />
+                                            {filteredResults.map((result) => {
+                                                const movie = result.item;
+                                                const type = result.type;
 
-                                                        {/* Simple Overlay on Hover */}
-                                                        <div className="absolute inset-0  bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center">
-                                                            <div className="rounded-full backdrop-blur-[1px] p-4 border border-brand-500 flex items-center justify-center  transform scale-75 group-hover:scale-100 transition-transform duration-300">
-                                                                <Play size={25} fill="currentColor" className="ml-1" />
-                                                            </div>
-                                                        </div>
-                                                        {/* Reference-style badges (Minimal Green) */}
-                                                        <div className="absolute top-2 right-2">
-                                                            <div className="px-1.5 py-0.5 bg-lime-500 text-black text-[8px] font-black uppercase rounded-[2px] flex items-center gap-0.5">
-                                                                {movie.genre.split(',')[0].trim().toLowerCase()}
-                                                            </div>
-                                                        </div>
-                                                        {movie.stars >= 8.5 && (
-                                                            <div className="absolute top-2 left-2">
-                                                                <div className="px-1.5 py-0.5 bg-brand-500/50 text-white text-[8px] font-bold uppercase rounded-none">
-                                                                    HD
+                                                return (
+                                                    <div
+                                                        key={`${type}-${movie.id}`}
+                                                        className="group flex flex-col gap-2 cursor-pointer"
+                                                        onClick={() => handleResultClick(result)}
+                                                    >
+                                                        {/* Image Container - Poster Focus */}
+                                                        <div className="relative aspect-[10/14] rounded-none overflow-hidden bg-gray-900 ">
+                                                            <img
+                                                                src={movie.poster_url}
+                                                                alt={movie.name}
+                                                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                                            />
+
+                                                            {/* Simple Overlay on Hover */}
+                                                            <div className="absolute inset-0  bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center">
+                                                                <div className="rounded-full backdrop-blur-[1px] p-4 border border-brand-500 flex items-center justify-center  transform scale-75 group-hover:scale-100 transition-transform duration-300">
+                                                                    <Play size={25} fill="currentColor" className="ml-1" />
                                                                 </div>
+                                                                {type === 'serie' && (
+                                                                    <span className="mt-2 text-[10px] font-black uppercase text-brand-500">View Series</span>
+                                                                )}
                                                             </div>
-                                                        )}
+                                                            {/* Reference-style badges (Minimal Green) */}
+                                                            <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
+                                                                <div className="px-1.5 py-0.5 bg-lime-500 text-black text-[8px] font-black uppercase rounded-[2px] flex items-center gap-0.5">
+                                                                    {movie.genre?.split(',')[0].trim().toLowerCase()}
+                                                                </div>
+                                                                {type === 'serie' && (
+                                                                    <div className="px-1.5 py-0.5 bg-brand-500 text-white text-[8px] font-black uppercase rounded-[2px]">
+                                                                        Series
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                            {movie.stars >= 8.5 && (
+                                                                <div className="absolute top-2 left-2">
+                                                                    <div className="px-1.5 py-0.5 bg-brand-500/50 text-white text-[8px] font-bold uppercase rounded-none">
+                                                                        HD
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        <div className="flex flex-col gap-0.5">
+                                                            <h3 className="text-[10px] font-bold text-gray-900 dark:text-gray-100 truncate uppercase tracking-tighter">
+                                                                {movie.name}
+                                                            </h3>
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            ))}
+                                                );
+                                            })}
                                         </>
                                     )}
 
-                                    {!isLoading && !isSearching && filteredMovies.length === 0 && (
+                                    {!isLoading && !isSearching && filteredResults.length === 0 && (
                                         <div className="col-span-full py-20 flex flex-col items-center justify-center border border-dashed border-gray-800 rounded">
                                             <Search size={32} className="text-gray-700 mb-4" />
                                             <h3 className="text-sm font-bold text-gray-400">

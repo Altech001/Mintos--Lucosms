@@ -69,7 +69,47 @@ export interface TransactionStatusResponse {
   transaction_uuid: string;
 }
 
+export interface UltimateSearchResult {
+  type: 'movie' | 'serie';
+  score: number;
+  item: MovieResponse | SeriesResponse;
+}
+
+export interface SuggestionResult {
+  name: string;
+  score: number;
+}
+
 export const moviesApi = {
+  ultimateSearch: async (query: string, limit: number = 20): Promise<UltimateSearchResult[]> => {
+    const response = await fetch(`${API_BASE_URL}/search/?q=${encodeURIComponent(query)}&limit=${limit}`, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Ultimate search failed: ${response.statusText}`);
+    }
+
+    return response.json();
+  },
+
+  suggestSearch: async (query: string): Promise<SuggestionResult[]> => {
+    const response = await fetch(`${API_BASE_URL}/search/suggest?q=${encodeURIComponent(query)}`, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Suggest search failed: ${response.statusText}`);
+    }
+
+    return response.json();
+  },
   getMovies: async (limit: number = 20, skip: number = 0): Promise<MovieResponse[]> => {
     const response = await fetch(`${API_BASE_URL}/movies/?limit=${limit}&skip=${skip}`, {
       method: 'GET',
@@ -302,7 +342,7 @@ export const moviesApi = {
   },
 
   deleteSeries: async (id: number): Promise<{ message: string }> => {
-    const response = await fetch(`${API_BASE_URL}/series/${id}/`, {
+    const response = await fetch(`${API_BASE_URL}/series/${id}`, {
       method: 'DELETE',
       headers: {
         'Accept': 'application/json',
@@ -366,7 +406,7 @@ export const moviesApi = {
   },
 
   deleteEpisode: async (episodeId: number): Promise<{ message: string }> => {
-    const response = await fetch(`${API_BASE_URL}/episodes/${episodeId}/`, {
+    const response = await fetch(`${API_BASE_URL}/episodes/${episodeId}`, {
       method: 'DELETE',
       headers: {
         'Accept': 'application/json',
@@ -398,7 +438,7 @@ export const moviesApi = {
   },
 
   deleteMovie: async (id: number): Promise<{ message: string }> => {
-    const response = await fetch(`${API_BASE_URL}/movies/${id}/`, {
+    const response = await fetch(`${API_BASE_URL}/movies/${id}`, {
       method: 'DELETE',
       headers: {
         'Accept': 'application/json',
@@ -407,6 +447,45 @@ export const moviesApi = {
 
     if (!response.ok) {
       throw new Error(`Failed to delete movie ${id}: ${response.statusText}`);
+    }
+
+    return response.json();
+  },
+
+  // Series Fixer Endpoints
+  getFixerMovies: async (): Promise<any[]> => {
+    const response = await fetch(`${API_BASE_URL}/fixer/movies`, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch fixer movies: ${response.statusText}`);
+    }
+
+    return response.json();
+  },
+
+  convertToSeries: async (payload: {
+    serie_name: string;
+    genre: string;
+    vj_name: string;
+    description: string;
+    movie_ids: number[];
+  }): Promise<any> => {
+    const response = await fetch(`${API_BASE_URL}/fixer/convert`, {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to convert movies to series: ${response.statusText}`);
     }
 
     return response.json();

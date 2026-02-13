@@ -21,8 +21,15 @@ export default function MoviesEditor() {
 
     // Queries
     const moviesQuery = useQuery({
-        queryKey: ['admin-movies', currentPage, itemsPerPage],
+        queryKey: ['admin-movies', currentPage, itemsPerPage, searchTerm],
         queryFn: async () => {
+            if (searchTerm.trim().length >= 2) {
+                const results = await moviesApi.ultimateSearch(searchTerm);
+                // Filter for movies and return the items
+                return results
+                    .filter(r => r.type === 'movie')
+                    .map(r => r.item as any); // Cast as any for simplicity in mapping
+            }
             const skip = (currentPage - 1) * itemsPerPage;
             return moviesApi.getMovies(itemsPerPage, skip);
         },
@@ -34,18 +41,10 @@ export default function MoviesEditor() {
         queryKey: ['movies-count'],
         queryFn: () => moviesApi.getMoviesCount(),
         staleTime: 5 * 60_000,
+        enabled: !searchTerm.trim(), // Only need count for pagination when not searching
     });
 
-    const movies = useMemo(() => {
-        const data = moviesQuery.data ?? [];
-        if (!searchTerm.trim()) return data;
-        const q = searchTerm.toLowerCase();
-        return data.filter(m =>
-            m.name.toLowerCase().includes(q) ||
-            m.genre?.toLowerCase().includes(q) ||
-            m.description?.toLowerCase().includes(q)
-        );
-    }, [moviesQuery.data, searchTerm]);
+    const movies = moviesQuery.data ?? [];
 
     const totalPages = Math.ceil((totalCountQuery.data ?? 0) / itemsPerPage) || 1;
 

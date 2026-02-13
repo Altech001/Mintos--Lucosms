@@ -187,6 +187,17 @@ export default function EditScreen() {
         onError: (e: any) => showErrorToast(e.message || 'Operation failed'),
     });
 
+    const deleteMovieMutation = useMutation({
+        mutationFn: () => moviesApi.deleteMovie(Number(id)),
+        onSuccess: () => {
+            showSuccessToast('Movie deleted successfully');
+            queryClient.invalidateQueries({ queryKey: ['admin-movies'] });
+            queryClient.invalidateQueries({ queryKey: ['movies-count'] });
+            navigate('/admin/movies');
+        },
+        onError: (e: any) => showErrorToast(e.message || 'Deletion failed'),
+    });
+
     const sendBatchMutation = useMutation({
         mutationFn: async () => {
             for (const movie of batch) {
@@ -237,6 +248,21 @@ export default function EditScreen() {
                     </button>
 
                     <div className="flex items-center gap-3">
+                        {isEditing && (
+                            <Button
+                                variant="outline"
+                                onClick={() => {
+                                    if (confirm(`Are you sure you want to delete "${name}"?`)) {
+                                        deleteMovieMutation.mutate();
+                                    }
+                                }}
+                                isLoading={deleteMovieMutation.isPending}
+                                className="rounded-none border-red-200 text-red-600 hover:bg-red-50"
+                            >
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Delete Movie
+                            </Button>
+                        )}
                         {!isEditing && (
                             <Button variant="outline" onClick={addToBatch} className="rounded-none border-gray-200 dark:border-gray-800">
                                 <Plus className="w-4 h-4 mr-2" />

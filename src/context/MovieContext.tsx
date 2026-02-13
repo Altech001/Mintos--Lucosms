@@ -1,6 +1,6 @@
 import { createContext, ReactNode, useContext, useState, useCallback, useRef, useEffect } from 'react';
 import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { MovieResponse, moviesApi } from './movies_api';
+import { MovieResponse, UltimateSearchResult, SuggestionResult, moviesApi } from './movies_api';
 
 interface MovieContextType {
     movies: MovieResponse[];
@@ -18,8 +18,10 @@ interface MovieContextType {
     // Search
     searchTerm: string;
     setSearchTerm: (term: string) => void;
-    searchResults: MovieResponse[];
+    searchResults: UltimateSearchResult[];
+    suggestions: SuggestionResult[];
     isSearching: boolean;
+    isSuggesting: boolean;
     isSearchMode: boolean;
 }
 
@@ -74,12 +76,20 @@ export function MovieProvider({ children }: { children: ReactNode }) {
         retry: 1, // Only retry once to avoid server spam on 500s
     });
 
-    // Server-wide search query — searches across ALL movies in the database
+    // Server-wide ultimate search query
     const { data: searchResults = [], isLoading: isSearching } = useQuery({
-        queryKey: ['movieSearch', debouncedSearch],
-        queryFn: () => moviesApi.searchMovies(debouncedSearch),
-        enabled: isSearchMode, // Only fetch when there's a meaningful search term
-        staleTime: 1000 * 60 * 2, // Cache search results for 2 minutes
+        queryKey: ['ultimateSearch', debouncedSearch],
+        queryFn: () => moviesApi.ultimateSearch(debouncedSearch),
+        enabled: isSearchMode,
+        staleTime: 1000 * 60 * 2,
+    });
+
+    // Suggestion search query
+    const { data: suggestions = [], isLoading: isSuggesting } = useQuery({
+        queryKey: ['suggestSearch', searchTerm],
+        queryFn: () => moviesApi.suggestSearch(searchTerm),
+        enabled: searchTerm.length >= 2,
+        staleTime: 1000 * 60 * 5,
     });
 
     const { data: movieCount = 0 } = useQuery({
@@ -130,7 +140,9 @@ export function MovieProvider({ children }: { children: ReactNode }) {
             searchTerm,
             setSearchTerm: handleSetSearchTerm,
             searchResults,
+            suggestions,
             isSearching,
+            isSuggesting,
             isSearchMode,
         }}>
             {children}

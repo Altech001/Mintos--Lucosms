@@ -144,6 +144,16 @@ export default function SeriesEditScreen() {
         }
     });
 
+    const deleteSeriesMutation = useMutation({
+        mutationFn: () => moviesApi.deleteSeries(Number(id)),
+        onSuccess: () => {
+            showSuccessToast('Series deleted successfully');
+            queryClient.invalidateQueries({ queryKey: ['admin-series'] });
+            navigate('/admin/series');
+        },
+        onError: (e: any) => showErrorToast(e.message)
+    });
+
     const resetEpForm = () => {
         setEditingEpisode(null);
         setEpName('');
@@ -179,17 +189,34 @@ export default function SeriesEditScreen() {
                         Back to Catalog
                     </button>
 
-                    <Button
-                        onClick={() => upsertSeriesMutation.mutate({
-                            name, description, poster_url: posterUrl, genre, vj_name: vjName,
-                            duration, release_date: releaseDate, category_name: categoryName, stars: Number(stars)
-                        })}
-                        isLoading={upsertSeriesMutation.isPending}
-                        className="rounded-none bg-brand-600 text-white min-w-[160px]"
-                    >
-                        <Save className="w-4 h-4 mr-2" />
-                        {isEditing ? 'Save Series' : 'Create Show'}
-                    </Button>
+                    <div className="flex items-center gap-3">
+                        {isEditing && (
+                            <Button
+                                variant="outline"
+                                onClick={() => {
+                                    if (confirm(`Are you sure you want to delete "${name}"? This action cannot be undone.`)) {
+                                        deleteSeriesMutation.mutate();
+                                    }
+                                }}
+                                isLoading={deleteSeriesMutation.isPending}
+                                className="rounded-none border-red-200 text-red-600 hover:bg-red-50"
+                            >
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Delete Series
+                            </Button>
+                        )}
+                        <Button
+                            onClick={() => upsertSeriesMutation.mutate({
+                                name, description, poster_url: posterUrl, genre, vj_name: vjName,
+                                duration, release_date: releaseDate, category_name: categoryName, stars: Number(stars)
+                            })}
+                            isLoading={upsertSeriesMutation.isPending}
+                            className="rounded-none bg-brand-600 text-white min-w-[160px]"
+                        >
+                            <Save className="w-4 h-4 mr-2" />
+                            {isEditing ? 'Save Series' : 'Create Show'}
+                        </Button>
+                    </div>
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

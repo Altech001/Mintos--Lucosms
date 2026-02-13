@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
     Calendar, ChevronLeft, ChevronRight,
     Film, FileJson, Plus, Search, Star, Trash2, Video,
-    Layers, Play
+    Layers, Play, Wand2
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -95,6 +95,14 @@ export default function SeriesEditor() {
                         >
                             <FileJson className="w-4 h-4 mr-2" />
                             Batch Upload
+                        </Button>
+                        <Button
+                            variant="outline"
+                            onClick={() => navigate('/admin/series/fixer')}
+                            className="w-full sm:w-auto rounded-none border-brand-200 dark:border-brand-900/40 text-brand-600"
+                        >
+                            <Wand2 className="w-4 h-4 mr-2" />
+                            Series Fixer
                         </Button>
                         <Button
                             onClick={() => navigate('/admin/series/new')}

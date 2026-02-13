@@ -14,6 +14,7 @@ interface SeriesContextType {
     searchResults: SeriesResponse[];
     isSearching: boolean;
     isSearchMode: boolean;
+    deleteSeries: (id: number) => Promise<any>;
 }
 
 const SeriesContext = createContext<SeriesContextType | undefined>(undefined);
@@ -77,6 +78,7 @@ export function SeriesProvider({ children }: { children: ReactNode }) {
             searchResults,
             isSearching: false,
             isSearchMode,
+            deleteSeries: moviesApi.deleteSeries,
         }}>
             {children}
         </SeriesContext.Provider>
