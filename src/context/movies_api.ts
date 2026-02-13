@@ -220,6 +220,23 @@ export const moviesApi = {
     return response.json();
   },
 
+  createMovie: async (movie: any): Promise<MovieResponse> => {
+    const response = await fetch(`${API_BASE_URL}/movies/`, {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(movie),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to create movie: ${response.statusText}`);
+    }
+
+    return response.json();
+  },
+
   getSeries: async (): Promise<SeriesResponse[]> => {
     const response = await fetch(`${API_BASE_URL}/series/`, {
       method: 'GET',
@@ -249,4 +266,175 @@ export const moviesApi = {
 
     return response.json();
   },
+
+  createSeries: async (series: any): Promise<SeriesResponse> => {
+    const response = await fetch(`${API_BASE_URL}/series/`, {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(series),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to create series: ${response.statusText}`);
+    }
+
+    return response.json();
+  },
+
+  updateSeries: async (id: number, series: any): Promise<SeriesResponse> => {
+    const response = await fetch(`${API_BASE_URL}/series/${id}/`, {
+      method: 'PUT',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(series),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to update series ${id}: ${response.statusText}`);
+    }
+
+    return response.json();
+  },
+
+  deleteSeries: async (id: number): Promise<{ message: string }> => {
+    const response = await fetch(`${API_BASE_URL}/series/${id}/`, {
+      method: 'DELETE',
+      headers: {
+        'Accept': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to delete series ${id}: ${response.statusText}`);
+    }
+
+    return response.json();
+  },
+
+  getEpisodes: async (seriesId: number): Promise<Episode[]> => {
+    const response = await fetch(`${API_BASE_URL}/series/${seriesId}/episodes/`, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch episodes for series ${seriesId}: ${response.statusText}`);
+    }
+
+    return response.json();
+  },
+
+  createEpisode: async (seriesId: number, episode: any): Promise<Episode> => {
+    const response = await fetch(`${API_BASE_URL}/series/${seriesId}/episodes/`, {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(episode),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to create episode: ${response.statusText}`);
+    }
+
+    return response.json();
+  },
+
+  updateEpisode: async (episodeId: number, episode: any): Promise<Episode> => {
+    const response = await fetch(`${API_BASE_URL}/episodes/${episodeId}/`, {
+      method: 'PUT',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(episode),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to update episode ${episodeId}: ${response.statusText}`);
+    }
+
+    return response.json();
+  },
+
+  deleteEpisode: async (episodeId: number): Promise<{ message: string }> => {
+    const response = await fetch(`${API_BASE_URL}/episodes/${episodeId}/`, {
+      method: 'DELETE',
+      headers: {
+        'Accept': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to delete episode ${episodeId}: ${response.statusText}`);
+    }
+
+    return response.json();
+  },
+
+  updateMovie: async (id: number, movie: any): Promise<MovieResponse> => {
+    const response = await fetch(`${API_BASE_URL}/movies/${id}/`, {
+      method: 'PUT',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(movie),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to update movie ${id}: ${response.statusText}`);
+    }
+
+    return response.json();
+  },
+
+  deleteMovie: async (id: number): Promise<{ message: string }> => {
+    const response = await fetch(`${API_BASE_URL}/movies/${id}/`, {
+      method: 'DELETE',
+      headers: {
+        'Accept': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to delete movie ${id}: ${response.statusText}`);
+    }
+
+    return response.json();
+  },
+};
+
+const TMDB_TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiIxODYzODYzZjg5MWNjY2I1ZDYzYzA0ODMwYmI2ODU3NiIsIm5iZiI6MTY5ODI4NDE5NS4yNzMsInN1YiI6IjY1MzljMmEzOTU1YzY1MDEzOGJjMjJmZCIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.ADxEh9Z7nfa_WPklA8ASlN3qPO_hR0m4Ebz_0HoOwPI';
+const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
+
+export const tmdbApi = {
+    searchMovies: async (query: string) => {
+        const response = await fetch(`${TMDB_BASE_URL}/search/movie?query=${encodeURIComponent(query)}`, {
+            headers: {
+                'Authorization': `Bearer ${TMDB_TOKEN}`,
+                'Accept': 'application/json'
+            }
+        });
+        if (!response.ok) throw new Error('TMDB Search failed');
+        return response.json();
+    },
+    getMovieDetails: async (tmdbId: number) => {
+        const response = await fetch(`${TMDB_BASE_URL}/movie/${tmdbId}?append_to_response=credits`, {
+            headers: {
+                'Authorization': `Bearer ${TMDB_TOKEN}`,
+                'Accept': 'application/json'
+            }
+        });
+        if (!response.ok) throw new Error('TMDB Details fetch failed');
+        return response.json();
+    }
 };

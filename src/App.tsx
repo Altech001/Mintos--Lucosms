@@ -6,6 +6,12 @@ import AppLayout from "./layout/AppLayout";
 import PromoCodeManagementPage from "./pages/Admin/PromoCodeManagement";
 import UserManagementPage from "./pages/Admin/UserManagement";
 import UserServices from "./pages/Admin/UserServices";
+import MoviesEditor from "./pages/Admin/MoviesEditor";
+import EditScreen from "./pages/Admin/EditScreen";
+import BatchUploader from "./pages/Admin/BatchUploader";
+import SeriesEditor from "./pages/Admin/Series/SeriesEditor";
+import SeriesEditScreen from "./pages/Admin/Series/SeriesEditScreen";
+import SeriesBatchUploader from "./pages/Admin/Series/SeriesBatchUploader";
 import ForgotPasswordPage from "./pages/AuthPages/ForgotPassword";
 import ResetPasswordPage from "./pages/AuthPages/ResetPasswordPage";
 import SignIn from "./pages/AuthPages/SignIn";
@@ -74,6 +80,14 @@ export default function App() {
               <Route path="/admin/users" element={<UserManagementPage />} />
               <Route path="/admin/promo-codes" element={<PromoCodeManagementPage />} />
               <Route path="/admin/services" element={<UserServices />} />
+              <Route path="/admin/movies" element={<MoviesEditor />} />
+              <Route path="/admin/movies/edit/:id" element={<EditScreen />} />
+              <Route path="/admin/movies/new" element={<EditScreen />} />
+              <Route path="/admin/movies/batch" element={<BatchUploader />} />
+              <Route path="/admin/series" element={<SeriesEditor />} />
+              <Route path="/admin/series/edit/:id" element={<SeriesEditScreen />} />
+              <Route path="/admin/series/new" element={<SeriesEditScreen />} />
+              <Route path="/admin/series/batch" element={<SeriesBatchUploader />} />
             </Route>
           </Route>
 

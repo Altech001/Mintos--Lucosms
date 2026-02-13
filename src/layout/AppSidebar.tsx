@@ -7,7 +7,8 @@ import {
   SettingsIcon,
   Share2Icon,
   StoreIcon,
-  UsersIcon
+  UsersIcon,
+  Film
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
@@ -87,6 +88,15 @@ const adminItems: NavItem[] = [
     name: "User Management",
     icon: <UsersIcon />,
     path: "/admin/users",
+  },
+  {
+    name: "Movies Editor",
+    icon: <Film />,
+    path: "/admin/movies",
+  }, {
+    name: "Series Editor",
+    icon: <Film />,
+    path: "/admin/series",
   },
   {
     name: "Share Credits",
