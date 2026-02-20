@@ -8,7 +8,8 @@ import {
   Share2Icon,
   StoreIcon,
   UsersIcon,
-  Film
+  Film,
+  UploadCloud
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
@@ -97,6 +98,11 @@ const adminItems: NavItem[] = [
     name: "Series Editor",
     icon: <Film />,
     path: "/admin/series",
+  },
+  {
+    name: "Series Batcher",
+    icon: <UploadCloud />,
+    path: "/admin/series-batcher",
   },
   {
     name: "Share Credits",
